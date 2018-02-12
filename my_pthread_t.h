@@ -26,7 +26,17 @@ typedef struct my_pthread_mutex_t {
 } my_pthread_mutex_t;
 
 /* define your data structures here: */
-
+typedef struct my_pthread_queue{
+    /* the front and the end of the queue; used for dequeue and enqueue*/
+    int front, end;
+    /* size: how may thread are in this queue; capacity: the capacity of the queue*/
+    int size,capacity;
+    /* the priority of the queue */
+    /* 0 --- means it is the running queue */
+    /* 1 --- means it is the wait queue with the first priority */
+    int p;
+    my_pthread_t* tArray;
+}tQueue;
 // Feel free to add your own auxiliary data structures
 
 
