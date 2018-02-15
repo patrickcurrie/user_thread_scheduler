@@ -31,7 +31,7 @@ typedef struct my_pthread_mutex_t {
 typedef struct my_pthread_node{
     //the thread stored in the node
     my_pthread_t* value;
-    my_pthread_t* next;
+    struct my_pthread_node* next;
 }tNode;
 
 /*a linked list act like a queue*/
