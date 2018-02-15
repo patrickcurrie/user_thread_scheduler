@@ -93,6 +93,7 @@ my_pthread_t* deQueue(int i){
         multi_level_pqueue[i]->front = multi_level_pqueue[i]->front->next;
         my_pthread_t* t = temp->value;
         free(temp);
+        multi_level_pqueue[i]->size++;
         return t;
     }
 }
