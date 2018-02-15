@@ -1,4 +1,4 @@
-// name: Patrick Currie
+// name: Patrick Currie, Ran Sa, Yaowen Zhang;
 // username of iLab:
 // iLab Server:
 
@@ -26,16 +26,21 @@ typedef struct my_pthread_mutex_t {
 } my_pthread_mutex_t;
 
 /* define your data structures here: */
+
+/*the node for the queue*/
+typedef struct my_pthread_node{
+    //the thread stored in the node
+    my_pthread_t* value;
+    my_pthread_t* next;
+}tNode;
+
+/*a linked list act like a queue*/
 typedef struct my_pthread_queue{
     /* the front and the end of the queue; used for dequeue and enqueue*/
-    int front, end;
-    /* size: how may thread are in this queue; capacity: the capacity of the queue*/
-    int size,capacity;
-    /* the priority of the queue */
-    /* 0 --- means it is the running queue */
-    /* 1 --- means it is the wait queue with the first priority */
-    int p;
-    my_pthread_t* tArray;
+    tNode*  front;
+    tNode* end;
+    /* size: how may thread are in this queue*/
+    int size;
 }tQueue;
 // Feel free to add your own auxiliary data structures
 

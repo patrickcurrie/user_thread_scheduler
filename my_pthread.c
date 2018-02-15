@@ -1,9 +1,10 @@
-// name: Patrick Currie
+// name: Patrick Currie, Ran Sa, Yaowen Zhang;
 // username of iLab:
 // iLab Server:
 
 #include "my_pthread_t.h"
 
+tQueue* multi_level_pqueue[3];
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
 	return 0;
@@ -43,71 +44,55 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
-tQueue* createQ(int capacity, int p){
-    //allocate memory for the queue
-    tQueue* q = (tQueue*)malloc(sizeof(tQueue));
-    q->p = p;
-    q->capacity=capacity;
-    q->size=0;
-    q->front=-1;
-    q->end=-1;
-    q->tArray = (my_pthread_t*) malloc(capacity* sizeof(my_pthread_t));
-    return q;
-}
-/* check if a queue is almost full */
-/* return 1 when it is almost full; 0 otherwise */
-int isFull(tQueue* tQ){
-    if(tQ->size>=(tQ->capacity)*0.8){
-        return 1;
+/*Create the 3 queue*/
+void createQ(){
+    //create and initialize 3 queues
+    for(int i=0; i<3;i++){
+        tQueue* t = (tQueue*)malloc(sizeof(tQueue));
+        t->size=0;
+        t->front=NULL;
+        t->end=NULL;
+        multi_level_pqueue[i]=t;
     }
-    return 0;
 }
-/* expand a queue when it is almost full */
-void expandQ(int newCapacity, tQueue* tQ){
-    my_pthread_t* newArray = (my_pthread_t*) malloc(newCapacity* sizeof(my_pthread_t));
-    for(int i=0; i<tQ->size;i++){
-        newArray[i] = deQueue(tQ);
-    }
-    my_pthread_t* oldArray = tQ->tArray;
-    tQ->tArray=NULL;
-    free(oldArray);
-    tQ->tArray = newArray;
-    tQ->front=0;
-    tQ->end = tQ->size-1;
-    tQ->capacity = newCapacity;
+
+/*Check the size of each queue*/
+/*arg1: int i -> the queue you want to get the size. e.g getSize(1) will give you the size of the first priority queue*/
+int getSize(int i){
+    i--;
+    return multi_level_pqueue[i]->size;
 }
 /* add a thread to the end of the queue */
-void enQueue(tQueue* tQ, my_pthread_t* thread){
-    //first check if there is enough room for the new thread, if not expand the queue
-    if(isFull(tQ)==1){
-        expandQ(tQ->capacity*2,tQ);
-    }
-    //then add to the end of the queue
-    if(tQ->end==tQ->capacity-1){
-        tQ->end = 0;
+/*arg1: int i -> the queue you want add the thread to. e.g  enQueue(1, t) will add thread t to the first priority queue*/
+/*arg2: my_pthread_t* thread-> the thread you want to add to the queue*/
+void enQueue(int i, my_pthread_t* thread){
+    i--;
+    //first create a node for the thread
+    tNode* node = (tNode*)malloc(sizeof(tNode));
+    node->value=thread;
+    node->next=NULL;
+    //add to the end of the queue
+    if(multi_level_pqueue[i]->end==NULL){
+        multi_level_pqueue[i]->front = node;
+        multi_level_pqueue[i]->end = node;
     }else{
-        tQ->end=tQ->end+1;
+        multi_level_pqueue[i]->end->next = node;
+        multi_level_pqueue[i]->end = multi_level_pqueue[i]->end->next;
     }
-    tQ->tArray[tQ->end] = thread;
-    tQ->size++;
-    if(tQ->front==-1) {
-        tQ->front = 0;
-    }
+    multi_level_pqueue[i]->size++;
 }
 /* pop the first thread out of the queue */
-my_pthread_t* deQueue(tQueue* tQ){
-    //first check if the queue is empty
-    if(tQ->size==0){
+/*arg1: int i -> the queue you want to pop the thread out. e.g  deQueue(1) will pop the first thread in the queue out*/
+my_pthread_t* deQueue(int i){
+    i--;
+    if(multi_level_pqueue[i]->front==NULL){
+        multi_level_pqueue[i]->end = NULL;
         return NULL;
-    }
-    my_pthread_t* r = NULL;
-    r = tQ->tArray[tQ->end];
-    tQ->tArray[tQ->end]=NULL;
-    if(tQ->end==0 && tQ->size>1){
-        tQ->end=tQ->capacity-1;
     }else{
-        tQ->end--;
+        tNode* temp = multi_level_pqueue[i]->front;
+        multi_level_pqueue[i]->front = multi_level_pqueue[i]->front->next;
+        my_pthread_t* t = temp->value;
+        free(temp);
+        return t;
     }
-    tQ->size--;
-    return r;
 }
