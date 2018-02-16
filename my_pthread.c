@@ -93,6 +93,10 @@ void scheduler_maintenance() {
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
 	// Create new tcb for thread
+	tcb *thread_tcb = malloc(sizeof(tcb));
+	thread_tcb->tid = thread;
+	
+
 
 	// Get current context
 
