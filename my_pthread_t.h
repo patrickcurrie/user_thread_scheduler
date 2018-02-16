@@ -19,8 +19,8 @@ typedef uint my_pthread_t;
 
 typedef struct threadControlBlock {
 	/* add something here */
-        ucontext_t context;
         my_pthread_t tid;
+        ucontext_t context;
         int state; // Running or waiting.
         int priority;
         struct timeval start_time;
@@ -60,7 +60,12 @@ void enqueue(queue *q, tcb *tcb_node);
 tcb * dequeue(queue *q);
 
 /* Get current time */
-struct *timeval current_time()
+struct *timeval current_time();
+
+/* Scheduler functions */
+void init_scheduler();
+
+void scheduler_maintenance();
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t *thread, pthread_attr_t *attr, void *(*function)(void*), void *arg);
