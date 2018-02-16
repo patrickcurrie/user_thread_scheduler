@@ -39,7 +39,7 @@ typedef struct {
         queue *wait_queue;
         tcb *scheduler_tcb; // So  we know where to to return to.
         tcb *current_tcb;
-        int priority_time_slices[];
+        int *priority_time_slices;
 } scheduler;
 
 typedef struct {
