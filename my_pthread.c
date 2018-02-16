@@ -92,6 +92,14 @@ void scheduler_maintenance() {
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
+	// Create new tcb for thread
+
+	// Get current context
+
+	// Use current context for as template for new context
+
+	// Instruct scheduler to start procedure for scheduling thread.
+
 	return 0;
 };
 
