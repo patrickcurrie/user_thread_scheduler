@@ -56,6 +56,13 @@ tcb * dequeue(queue * q) {
 	return tmp;
 }
 
+/* Get current time */
+struct *timeval current_time() {
+	struct *timeval tv;
+	gettimeofday(tv, NULL);
+	return tv;
+}
+
 /* Initialize scheduler */
 void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
@@ -80,7 +87,7 @@ void init_scheduler() {
 Maintenance done on the multi level priority queue to handle the SIGALRM signal.
 */
 void scheduler_maintenance() {
-	
+
 }
 
 /* create a new thread */

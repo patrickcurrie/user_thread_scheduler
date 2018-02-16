@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 typedef uint my_pthread_t;
 
@@ -56,6 +57,9 @@ void queue_init(queue *q);
 void enqueue(queue *q, tcb *tcb_node);
 
 tcb * dequeue(queue *q);
+
+/* Get current time */
+struct *timeval current_time()
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t *thread, pthread_attr_t *attr, void *(*function)(void*), void *arg);
