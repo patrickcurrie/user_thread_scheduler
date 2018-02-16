@@ -1,10 +1,71 @@
-// name: Patrick Currie, Ran Sa, Yaowen Zhang;
+// name:
 // username of iLab:
 // iLab Server:
 
 #include "my_pthread_t.h"
 
-tQueue* multi_level_pqueue[3];
+/* Globals */
+scheduler * SCHEDULER;
+
+/* Queue Functions */
+void queue_init(queue * q) {
+	q->head = NULL;
+	q->tail = NULL;
+	q->size = 0;
+}
+
+/*
+If the queue is empty, than the head and tail will point to the same node after
+enqueue. If it is not empty, then node will be inserted before the tail of the
+queue, and become the new tail.
+*/
+void enqueue(queue * q, tcb * tcb_node) {
+	if (first->size == 0) {
+		q->head = tcb_node;
+		q->tail = tcb_node;
+		q->size++;
+	} else {
+		q->tail->next_tcb = tcb_node;
+		q->tail = tcb_node;
+		q->size++;
+	}
+}
+
+/*
+If queue is empty, returns NULL. If queue has onlu 1 node, set tmp to what
+head points to, then set head and tail to NULL and return tmp. Else, set tmp to
+what head points to, and adjust head.
+*/
+tcb * dequeue(queue * q) {
+	if (q->size == 0) {
+		return NULL;
+	}
+	tcb * tmp;
+	if (q->size == 1) {
+		tmp = q->head;
+		q->head = NULL;
+		q->tail = NULL;
+	} else {
+		tmp = q->head;
+		q->head = qt->head->next_tcb;
+	}
+	tmp->next_tcb = NULL;
+	first->size--;
+	return tmp;
+}
+
+/* Initialize scheduler */
+void init_scheduler() {
+	SCHEDULER = malloc(sizeof(scheduler));
+	SCHEDULER->multi_level_priority_queue = malloc(NUM_LEVELS * sizeof(queue));
+	SCHEDULER->wait_queue = malloc(sizeof(queue));
+	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb));
+	SCHEDULER->current_tcb = malloc(sizeof(tcb));
+	SCHEDULER->priority_time_slices
+
+	for (int i = 0; i < )
+}
+
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
 	return 0;
@@ -43,57 +104,3 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
-
-/*Create the 3 queue*/
-void createQ(){
-    //create and initialize 3 queues
-    for(int i=0; i<3;i++){
-        tQueue* t = (tQueue*)malloc(sizeof(tQueue));
-        t->size=0;
-        t->front=NULL;
-        t->end=NULL;
-        multi_level_pqueue[i]=t;
-    }
-}
-
-/*Check the size of each queue*/
-/*arg1: int i -> the queue you want to get the size. e.g getSize(1) will give you the size of the first priority queue*/
-int getSize(int i){
-    i--;
-    return multi_level_pqueue[i]->size;
-}
-/* add a thread to the end of the queue */
-/*arg1: int i -> the queue you want add the thread to. e.g  enQueue(1, t) will add thread t to the first priority queue*/
-/*arg2: my_pthread_t* thread-> the thread you want to add to the queue*/
-void enQueue(int i, my_pthread_t* thread){
-    i--;
-    //first create a node for the thread
-    tNode* node = (tNode*)malloc(sizeof(tNode));
-    node->value=thread;
-    node->next=NULL;
-    //add to the end of the queue
-    if(multi_level_pqueue[i]->end==NULL){
-        multi_level_pqueue[i]->front = node;
-        multi_level_pqueue[i]->end = node;
-    }else{
-        multi_level_pqueue[i]->end->next = node;
-        multi_level_pqueue[i]->end = multi_level_pqueue[i]->end->next;
-    }
-    multi_level_pqueue[i]->size++;
-}
-/* pop the first thread out of the queue */
-/*arg1: int i -> the queue you want to pop the thread out. e.g  deQueue(1) will pop the first thread in the queue out*/
-my_pthread_t* deQueue(int i){
-    i--;
-    if(multi_level_pqueue[i]->front==NULL){
-        multi_level_pqueue[i]->end = NULL;
-        return NULL;
-    }else{
-        tNode* temp = multi_level_pqueue[i]->front;
-        multi_level_pqueue[i]->front = multi_level_pqueue[i]->front->next;
-        my_pthread_t* t = temp->value;
-        free(temp);
-        multi_level_pqueue[i]->size++;
-        return t;
-    }
-}

@@ -1,7 +1,6 @@
-// name: Patrick Currie, Ran Sa, Yaowen Zhang;
+// name:
 // username of iLab:
 // iLab Server:
-
 #ifndef MY_PTHREAD_T_H
 #define MY_PTHREAD_T_H
 
@@ -18,6 +17,12 @@ typedef uint my_pthread_t;
 
 typedef struct threadControlBlock {
 	/* add something here */
+        ucontext_t context;
+        my_pthread_t tid;
+        int state; // Running or waiting.
+        int priority;
+        int last_start;
+        tcb *next_tcb;
 } tcb;
 
 /* mutex struct definition */
@@ -27,28 +32,33 @@ typedef struct my_pthread_mutex_t {
 
 /* define your data structures here: */
 
-/*the node for the queue*/
-typedef struct my_pthread_node{
-    //the thread stored in the node
-    my_pthread_t* value;
-    struct my_pthread_node* next;
-}tNode;
-
-/*a linked list act like a queue*/
-typedef struct my_pthread_queue{
-    /* the front and the end of the queue; used for dequeue and enqueue*/
-    tNode*  front;
-    tNode* end;
-    /* size: how may thread are in this queue*/
-    int size;
-}tQueue;
 // Feel free to add your own auxiliary data structures
 
+typedef struct {
+        queue *multi_level_priority_queue;
+        queue *wait_queue;
+        tcb *scheduler_tcb; // So  we know where to to return to.
+        tcb *current_tcb;
+        int priority_time_slices[];
+} scheduler;
+
+typedef struct {
+	tcb *head;
+	tcb *tail;
+	int size;
+} queue;
 
 /* Function Declarations: */
 
+/* Queue Functions */
+void queue_init(queue *q);
+
+void enqueue(queue *q, tcb *tcb_node);
+
+tcb * dequeue(queue *q);
+
 /* create a new thread */
-int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg);
+int my_pthread_create(my_pthread_t *thread, pthread_attr_t *attr, void *(*function)(void*), void *arg);
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield();
