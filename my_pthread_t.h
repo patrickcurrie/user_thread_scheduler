@@ -7,6 +7,7 @@
 #define _GNU_SOURCE
 
 /* include lib header files that you need here: */
+#include <ucontext.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
