@@ -6,6 +6,8 @@
 
 /* Globals */
 scheduler * SCHEDULER;
+int NUM_LEVELS;
+int TIME_SLICE;
 
 /* Queue Functions */
 void queue_init(queue * q) {
@@ -57,13 +59,28 @@ tcb * dequeue(queue * q) {
 /* Initialize scheduler */
 void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
-	SCHEDULER->multi_level_priority_queue = malloc(NUM_LEVELS * sizeof(queue));
-	SCHEDULER->wait_queue = malloc(sizeof(queue));
-	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb));
-	SCHEDULER->current_tcb = malloc(sizeof(tcb));
-	SCHEDULER->priority_time_slices
+	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUM_LEVELS);
+	for (int i = 0; i < NUM_LEVELS; i++) {
+		queue_init(SCHEDULER->multi_level_priority_queue[i]);
+	}
 
-	for (int i = 0; i < )
+	SCHEDULER->wait_queue = malloc(sizeof(queue));
+	queue_init(SCHEDULER->wait_queue);
+	SCHEDULER->current_tcb = malloc(sizeof(tcb));
+	SCHEDULER->current_tcb = NULL;
+	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUM_LEVELS);
+	for (int i = 0; i < NUM_LEVELS; i++) {
+		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
+	}
+
+	signal(SIGALRM, scheduler_maintenance);
+}
+
+/*
+Maintenance done on the multi level priority queue to handle the SIGALRM signal.
+*/
+void scheduler_maintenance() {
+	
 }
 
 /* create a new thread */
