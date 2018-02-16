@@ -22,7 +22,7 @@ typedef struct threadControlBlock {
         my_pthread_t tid;
         int state; // Running or waiting.
         int priority;
-        int last_start;
+        struct timeval start_time;
         tcb *next_tcb;
 } tcb;
 
