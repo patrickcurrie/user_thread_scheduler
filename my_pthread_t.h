@@ -21,9 +21,11 @@ typedef struct threadControlBlock {
 	/* add something here */
         my_pthread_t tid;
         ucontext_t context;
-        int state; // Running or waiting.
+        thread_state state;
         int priority;
         struct timeval start_time;
+        struct timeval last_yield_time;
+        void *return_value;
         tcb *next_tcb;
 } tcb;
 
@@ -35,6 +37,14 @@ typedef struct my_pthread_mutex_t {
 /* define your data structures here: */
 
 // Feel free to add your own auxiliary data structures
+
+typedef enum {
+        RUNNING, // Currently running.
+        READY, // Scheduled (in multi-level priority queue), in line to be run.
+        WAITING, // Waiting in wait queue to aquire lock to critical section.
+        YIELDED, // Yielded control to next thread to be run (in multi-level priority queue).
+        TERMINATED // Thread finished running or was terminated early.
+} thread_state;
 
 typedef struct {
         queue *multi_level_priority_queue;
