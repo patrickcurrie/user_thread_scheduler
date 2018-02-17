@@ -69,8 +69,10 @@ void enqueue(queue *q, tcb *tcb_node);
 
 tcb *dequeue(queue *q);
 
+tcb *peek(queue * q);
+
 /* Get current time */
-struct timeval *current_time();
+struct timeval current_time();
 
 /* Scheduler functions */
 void init_scheduler();
