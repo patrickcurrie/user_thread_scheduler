@@ -6,8 +6,13 @@
 
 /* Globals */
 scheduler * SCHEDULER;
-int NUM_LEVELS;
+int NUMBER_LEVELS;
 int TIME_SLICE;
+int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
+
+static void thread_function_wrapper(void *(*function) (void *), void *arg) {
+	
+}
 
 /* Queue Functions */
 void queue_init(queue * q) {
@@ -66,8 +71,8 @@ struct *timeval current_time() {
 /* Initialize scheduler */
 void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
-	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUM_LEVELS);
-	for (int i = 0; i < NUM_LEVELS; i++) {
+	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUMBER_LEVELS);
+	for (int i = 0; i < NUMBER_LEVELS; i++) {
 		queue_init(SCHEDULER->multi_level_priority_queue[i]);
 	}
 
@@ -75,8 +80,8 @@ void init_scheduler() {
 	queue_init(SCHEDULER->wait_queue);
 	SCHEDULER->current_tcb = malloc(sizeof(tcb));
 	SCHEDULER->current_tcb = NULL;
-	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUM_LEVELS);
-	for (int i = 0; i < NUM_LEVELS; i++) {
+	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
+	for (int i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
 
@@ -91,16 +96,20 @@ void scheduler_maintenance() {
 }
 
 /* create a new thread */
-int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
+int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
 	// Create new tcb for thread
+	// Get current context
 	tcb *thread_tcb = malloc(sizeof(tcb));
 	thread_tcb->tid = thread;
-	
-
-
-	// Get current context
+	if (getcontext(thread_tcb->context)) != 0) {
+		return -1; // Error getthing context.
+	}
 
 	// Use current context for as template for new context
+	thread->context->uc_stack.ss_sp = malloc(STACK_SIZE);
+	thread->context->uc_stack.ss_flags = 0;
+	thread->context->uc_stack.ss_size = STACK_SIZE;
+	makecontext(&(thread->context, function, ),
 
 	// Instruct scheduler to start procedure for scheduling thread.
 
