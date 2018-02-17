@@ -39,6 +39,8 @@ static void schedule_thread(tcb * tcb_node, int priority) {
 }
 
 /* Queue Functions */
+
+/* Initializes a queue */
 void queue_init(queue * q) {
 	q->head = NULL;
 	q->tail = NULL;
@@ -124,24 +126,20 @@ void scheduler_maintenance() {
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
-	// Create new tcb for thread
-	// Get current context
+	// Create new tcb for thread.
+	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
 	tcb_node->tid = thread;
 	if (getcontext(tcb_node->context)) != 0) {
 		return -1; // Error getthing context.
 	}
-
-	// Use current context for as template for new context
+	// Configure context stack.
 	thread->context->uc_stack.ss_sp = malloc(STACK_SIZE);
 	thread->context->uc_stack.ss_flags = 0;
 	thread->context->uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(thread->context, (void *) thread_function_wrapper, 3, tcb_node, function, arg);
-
-	// Instruct scheduler to start procedure for scheduling thread.
-
 	return 0;
-};
+}
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
@@ -176,3 +174,8 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
+
+int main() {
+	// Test code here
+	return 0;
+}
