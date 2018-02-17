@@ -29,13 +29,14 @@ static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), v
 Enqueue's a tcb to a given level of the multi-level priority queue. Sets
 the state of the thread tcb to READY.
 */
-static void schedule_thread(tcb * tcb_node, int priority) {
+static int schedule_thread(tcb * tcb_node, int priority) {
 	if (priority < 0 || priority > NUMBER_LEVELS - 1) {
-		return -1 // Error invalid priority.
+		return -1; // Error invalid priority.
 	}
 	tcb_node->state = READY;
 	tcb_node->priority = priority;
-	enqueue(SCHEDULER->multi_level_priority_queue[priority], tcb_node);
+	enqueue(&(SCHEDULER->multi_level_priority_queue[priority]), tcb_node);
+	return 0;
 }
 
 /* Queue Functions */
@@ -53,7 +54,7 @@ enqueue. If it is not empty, then node will be inserted before the tail of the
 queue, and become the new tail.
 */
 void enqueue(queue * q, tcb * tcb_node) {
-	if (first->size == 0) {
+	if (q->size == 0) {
 		q->head = tcb_node;
 		q->tail = tcb_node;
 		q->size++;
@@ -80,16 +81,16 @@ tcb * dequeue(queue * q) {
 		q->tail = NULL;
 	} else {
 		tmp = q->head;
-		q->head = qt->head->next_tcb;
+		q->head = q->head->next_tcb;
 	}
 	tmp->next_tcb = NULL;
-	first->size--;
+	q->size--;
 	return tmp;
 }
 
 /* Get current time */
-struct *timeval current_time() {
-	struct *timeval tv;
+struct timeval *current_time() {
+	struct timeval *tv;
 	gettimeofday(tv, NULL);
 	return tv;
 }
@@ -99,7 +100,7 @@ void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
 	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUMBER_LEVELS);
 	for (int i = 0; i < NUMBER_LEVELS; i++) {
-		queue_init(SCHEDULER->multi_level_priority_queue[i]);
+		queue_init(&(SCHEDULER->multi_level_priority_queue[i]));
 	}
 
 	SCHEDULER->wait_queue = malloc(sizeof(queue));
@@ -112,6 +113,7 @@ void init_scheduler() {
 	}
 
 	signal(SIGALRM, scheduler_maintenance);
+	alarm(1); // Maybe this should be settimer? Need a way to fire SIGALRM signal every n seconds.
 }
 
 /*
@@ -123,7 +125,7 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
-
+	printf("Test\n");
 }
 
 /* create a new thread */
@@ -131,25 +133,25 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
-	tcb_node->tid = thread;
-	if (getcontext(tcb_node->context)) != 0) {
+	tcb_node->tid = *thread;
+	if (getcontext(&(tcb_node->context)) != 0) {
 		return -1; // Error getthing context.
 	}
 	// Configure context stack.
-	thread->context->uc_stack.ss_sp = malloc(STACK_SIZE);
-	thread->context->uc_stack.ss_flags = 0;
-	thread->context->uc_stack.ss_size = STACK_SIZE;
-	makecontext(&(thread->context, (void *) thread_function_wrapper, 3, tcb_node, function, arg);
+	tcb_node->context.uc_stack.ss_sp = malloc(STACK_SIZE);
+	tcb_node->context.uc_stack.ss_flags = 0;
+	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
+	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
 	return 0;
 }
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
 	int current_priority = SCHEDULER->current_tcb->priority;
-	tcb *tcb_node = dequeue(SCHEDULER->multi_level_priority_queue[current_priority]);
-	tcb_node->state = READY
+	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+	tcb_node->state = READY;
 	schedule_thread(tcb_node, tcb_node->priority);
-	SCHEDULER->current_tcb = dequeue(SCHEDULER->multi_level_priority_queue[current_priority]);
+	SCHEDULER->current_tcb = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
 	SCHEDULER->current_tcb->state = RUNNING;
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
@@ -187,5 +189,7 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 
 int main() {
 	// Test code here
+	init_scheduler();
+	sleep(10);
 	return 0;
 }

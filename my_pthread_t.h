@@ -9,6 +9,7 @@
 /* include lib header files that you need here: */
 #include <ucontext.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -17,16 +18,23 @@
 
 typedef uint my_pthread_t;
 
+typedef enum thread_state {
+        RUNNING, // Currently running.
+        READY, // Scheduled (in multi-level priority queue), in line to be run.
+        WAITING, // Waiting in wait queue to aquire lock to critical section.
+        TERMINATED // Thread finished running or was terminated early.
+} thread_state;
+
 typedef struct threadControlBlock {
 	/* add something here */
         my_pthread_t tid;
         ucontext_t context;
-        thread_state state;
+        enum thread_state state;
         int priority;
         struct timeval start_time;
         struct timeval last_yield_time;
         void *return_value;
-        tcb *next_tcb;
+        struct threadControlBlock *next_tcb;
 } tcb;
 
 /* mutex struct definition */
@@ -38,12 +46,11 @@ typedef struct my_pthread_mutex_t {
 
 // Feel free to add your own auxiliary data structures
 
-typedef enum {
-        RUNNING, // Currently running.
-        READY, // Scheduled (in multi-level priority queue), in line to be run.
-        WAITING, // Waiting in wait queue to aquire lock to critical section.
-        TERMINATED // Thread finished running or was terminated early.
-} thread_state;
+typedef struct queue {
+	tcb *head;
+	tcb *tail;
+	int size;
+} queue;
 
 typedef struct {
         queue *multi_level_priority_queue;
@@ -53,12 +60,6 @@ typedef struct {
         int *priority_time_slices;
 } scheduler;
 
-typedef struct {
-	tcb *head;
-	tcb *tail;
-	int size;
-} queue;
-
 /* Function Declarations: */
 
 /* Queue Functions */
@@ -66,10 +67,10 @@ void queue_init(queue *q);
 
 void enqueue(queue *q, tcb *tcb_node);
 
-tcb * dequeue(queue *q);
+tcb *dequeue(queue *q);
 
 /* Get current time */
-struct *timeval current_time();
+struct timeval *current_time();
 
 /* Scheduler functions */
 void init_scheduler();
