@@ -143,6 +143,18 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
+	tcb *tcb_node = dequeue(SCHEDULER->multi_level_priority_queue[SCHEDULER->current_tcb->priority]);
+	tcb_node->state = READY
+	if (SCHEDULER->multi_level_priority_queue(tcb_node->priority)->size == 0) {
+		if (SCHEDULER->multi_level_priority_queue(tcb_node->priority) == NUMBER_LEVELS - 1) {
+			// Swap context with head of first priotity queue.
+		} else {
+			// Swap context head of next lowest priority queue.
+		}
+	} else {
+		// Swap context with next node in current queue.
+	}
+	schedule_thread(tcb_node, tcb_node->priority);
 	return 0;
 };
 
