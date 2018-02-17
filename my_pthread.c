@@ -10,7 +10,17 @@ int NUMBER_LEVELS;
 int TIME_SLICE;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
-static void thread_function_wrapper(void *(*function) (void *), void *arg) {
+/* Static internal functions */
+static void thread_function_wrapper(tcb *thread_tcb, void *(*function) (void *), void *arg) {
+	SCHEDULER->current_tcb = thread_tcb;
+	thread_tcb->state = RUNNING;
+	thread_tcb->return_value = (*function)(arg);
+	thread_tcb->state = TERMINATED;
+	SCHEDULER->current_tcb = NULL;
+	scheduler_maintenance(); // Clean terminated thread from SCHEDULER->multi_level_priority_queue.
+}
+
+static void schedule_thread(tcb * thread_tcb, int priority) {
 	
 }
 
@@ -78,8 +88,7 @@ void init_scheduler() {
 
 	SCHEDULER->wait_queue = malloc(sizeof(queue));
 	queue_init(SCHEDULER->wait_queue);
-	SCHEDULER->current_tcb = malloc(sizeof(tcb));
-	SCHEDULER->current_tcb = NULL;
+	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
 	for (int i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
@@ -89,7 +98,11 @@ void init_scheduler() {
 }
 
 /*
-Maintenance done on the multi level priority queue to handle the SIGALRM signal.
+Maintenance done on the multi-level priority queue to handle the SIGALRM signal.
+
+Responsible for:
+- Deleting threads with TERMINATED state from multi-level priotity queue (free tcb and adjust queue).
+- Promoting and demoting threads in multi-level priority queue.
 */
 void scheduler_maintenance() {
 
@@ -109,7 +122,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	thread->context->uc_stack.ss_sp = malloc(STACK_SIZE);
 	thread->context->uc_stack.ss_flags = 0;
 	thread->context->uc_stack.ss_size = STACK_SIZE;
-	makecontext(&(thread->context, function, ),
+	makecontext(&(thread->context, (void *) thread_function_wrapper, 3, thread_tcb, function, arg);
 
 	// Instruct scheduler to start procedure for scheduling thread.
 
