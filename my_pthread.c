@@ -19,6 +19,7 @@ thread to run, and cleanup after the thread finishes.
 static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), void *arg) {
 	SCHEDULER->current_tcb = tcb_node;
 	tcb_node->state = RUNNING;
+	tcb_node->start_time = current_time();
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;
@@ -70,7 +71,7 @@ If queue is empty, returns NULL. If queue has onlu 1 node, set tmp to what
 head points to, then set head and tail to NULL and return tmp. Else, set tmp to
 what head points to, and adjust head.
 */
-tcb * dequeue(queue * q) {
+tcb *dequeue(queue * q) {
 	if (q->size == 0) {
 		return NULL;
 	}
@@ -88,11 +89,15 @@ tcb * dequeue(queue * q) {
 	return tmp;
 }
 
+tcb *peek(queue * q) {
+	return q->head;
+}
+
 /* Get current time */
-struct timeval *current_time() {
+struct timeval current_time() {
 	struct timeval *tv;
 	gettimeofday(tv, NULL);
-	return tv;
+	return *tv;
 }
 
 /* Initialize scheduler */
@@ -151,9 +156,10 @@ int my_pthread_yield() {
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	tcb_node->state = READY;
 	schedule_thread(tcb_node, tcb_node->priority);
-	SCHEDULER->current_tcb = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+	SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
 	SCHEDULER->current_tcb->state = RUNNING;
+	tcb_node->last_yield_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
 	return 0;
 };
