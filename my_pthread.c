@@ -30,7 +30,7 @@ Enqueue's a tcb to a given level of the multi-level priority queue. Sets
 the state of the thread tcb to READY.
 */
 static void schedule_thread(tcb * tcb_node, int priority) {
-	if (priority < 0 || priority > NUMBER_LEVELS) {
+	if (priority < 0 || priority > NUMBER_LEVELS - 1) {
 		return -1 // Error invalid priority.
 	}
 	tcb_node->state = READY;
@@ -104,6 +104,7 @@ void init_scheduler() {
 
 	SCHEDULER->wait_queue = malloc(sizeof(queue));
 	queue_init(SCHEDULER->wait_queue);
+	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb)); // Set when context is swapped out of scheduler context.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
 	for (int i = 0; i < NUMBER_LEVELS; i++) {
@@ -119,6 +120,7 @@ Maintenance done on the multi-level priority queue to handle the SIGALRM signal.
 Responsible for:
 - Deleting threads with TERMINATED state from multi-level priotity queue (free tcb and adjust queue).
 - Promoting and demoting threads in multi-level priority queue.
+- Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
 
@@ -143,18 +145,14 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
-	tcb *tcb_node = dequeue(SCHEDULER->multi_level_priority_queue[SCHEDULER->current_tcb->priority]);
+	int current_priority = SCHEDULER->current_tcb->priority;
+	tcb *tcb_node = dequeue(SCHEDULER->multi_level_priority_queue[current_priority]);
 	tcb_node->state = READY
-	if (SCHEDULER->multi_level_priority_queue(tcb_node->priority)->size == 0) {
-		if (SCHEDULER->multi_level_priority_queue(tcb_node->priority) == NUMBER_LEVELS - 1) {
-			// Swap context with head of first priotity queue.
-		} else {
-			// Swap context head of next lowest priority queue.
-		}
-	} else {
-		// Swap context with next node in current queue.
-	}
 	schedule_thread(tcb_node, tcb_node->priority);
+	SCHEDULER->current_tcb = dequeue(SCHEDULER->multi_level_priority_queue[current_priority]);
+	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
+	SCHEDULER->current_tcb->state = RUNNING;
+	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
 	return 0;
 };
 
