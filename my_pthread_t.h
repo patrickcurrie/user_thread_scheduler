@@ -42,7 +42,6 @@ typedef enum {
         RUNNING, // Currently running.
         READY, // Scheduled (in multi-level priority queue), in line to be run.
         WAITING, // Waiting in wait queue to aquire lock to critical section.
-        YIELDED, // Yielded control to next thread to be run (in multi-level priority queue).
         TERMINATED // Thread finished running or was terminated early.
 } thread_state;
 
