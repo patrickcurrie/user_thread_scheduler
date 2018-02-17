@@ -11,17 +11,31 @@ int TIME_SLICE;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
 /* Static internal functions */
-static void thread_function_wrapper(tcb *thread_tcb, void *(*function) (void *), void *arg) {
-	SCHEDULER->current_tcb = thread_tcb;
-	thread_tcb->state = RUNNING;
-	thread_tcb->return_value = (*function)(arg);
-	thread_tcb->state = TERMINATED;
+
+/*
+Handles argument passing to the function run by a thread, preperation for the
+thread to run, and cleanup after the thread finishes.
+*/
+static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), void *arg) {
+	SCHEDULER->current_tcb = tcb_node;
+	tcb_node->state = RUNNING;
+	tcb_node->return_value = (*function)(arg);
+	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;
 	scheduler_maintenance(); // Clean terminated thread from SCHEDULER->multi_level_priority_queue.
 }
 
-static void schedule_thread(tcb * thread_tcb, int priority) {
-	
+/*
+Enqueue's a tcb to a given level of the multi-level priority queue. Sets
+the state of the thread tcb to READY.
+*/
+static void schedule_thread(tcb * tcb_node, int priority) {
+	if (priority < 0 || priority > NUMBER_LEVELS) {
+		return -1 // Error invalid priority.
+	}
+	tcb_node->state = READY;
+	tcb_node->priority = priority;
+	enqueue(SCHEDULER->multi_level_priority_queue[priority], tcb_node);
 }
 
 /* Queue Functions */
@@ -112,9 +126,9 @@ void scheduler_maintenance() {
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
 	// Create new tcb for thread
 	// Get current context
-	tcb *thread_tcb = malloc(sizeof(tcb));
-	thread_tcb->tid = thread;
-	if (getcontext(thread_tcb->context)) != 0) {
+	tcb *tcb_node = malloc(sizeof(tcb));
+	tcb_node->tid = thread;
+	if (getcontext(tcb_node->context)) != 0) {
 		return -1; // Error getthing context.
 	}
 
@@ -122,7 +136,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	thread->context->uc_stack.ss_sp = malloc(STACK_SIZE);
 	thread->context->uc_stack.ss_flags = 0;
 	thread->context->uc_stack.ss_size = STACK_SIZE;
-	makecontext(&(thread->context, (void *) thread_function_wrapper, 3, thread_tcb, function, arg);
+	makecontext(&(thread->context, (void *) thread_function_wrapper, 3, tcb_node, function, arg);
 
 	// Instruct scheduler to start procedure for scheduling thread.
 
