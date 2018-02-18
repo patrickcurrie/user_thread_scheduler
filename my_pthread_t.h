@@ -40,6 +40,8 @@ typedef struct threadControlBlock {
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
 	/* add something here */
+        mypthread_t lock_owner;          // Thread owning the mutex
+        queue *lock_wait_queue;
 } my_pthread_mutex_t;
 
 /* define your data structures here: */
@@ -54,7 +56,7 @@ typedef struct queue {
 
 typedef struct {
         queue *multi_level_priority_queue;
-        queue *wait_queue;
+        queue *wait_queues;
         tcb *scheduler_tcb; // So  we know where to to return to.
         tcb *current_tcb;
         int *priority_time_slices;
