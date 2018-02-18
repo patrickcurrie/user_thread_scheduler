@@ -21,7 +21,7 @@ thread to run, and cleanup after the thread finishes.
 static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), void *arg) {
 	SCHEDULER->current_tcb = tcb_node;
 	tcb_node->state = RUNNING;
-	tcb_node->start_time = current_time();
+	tcb_node->initial_start_time = current_time();
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;

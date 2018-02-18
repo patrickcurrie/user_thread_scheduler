@@ -31,7 +31,7 @@ typedef struct threadControlBlock {
         ucontext_t context;
         enum thread_state state;
         int priority;
-        struct timeval start_time;
+        struct timeval initial_start_time;
         struct timeval last_yield_time;
         void *return_value;
         struct threadControlBlock *next_tcb;
