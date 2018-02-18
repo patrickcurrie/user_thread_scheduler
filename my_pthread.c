@@ -118,12 +118,62 @@ void init_scheduler() {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
 
-	signal(SIGALRM, scheduler_maintenance);
-	alarm(1); // Maybe this should be settimer? Need a way to fire SIGALRM signal every n seconds.
 }
 
+void execute(){
+    while(1==1){
+        schedule_handler();
+        scheduler_maintenance();
+    }
+    return;
+}
+
+void schedule_handler(){
+    struct timeval start_time = current_time();
+    while(time_compare(start_time,current_time(),100000)==-1){
+        if(){
+
+        }
+    }
+}
+
+
+
+
 /*A helper function for maintain to compare time*/
-int time_compare
+/* return 1 if the gap between start and end is larger than gap
+ * return 0 if the gap between start and end is the same as the gap
+ * return -1 if the gap between start and end is smaller than the gap
+ * */
+/*PS: gap's unit is in microsecond*/
+int time_compare(struct timeval start, struct timeval end, int gap){
+    int gap_second = 0;
+    int gap_microsecond = 0;
+    int start_sec = start.tv_sec;
+    int start_micro = start.tv_usec;
+    int end_sec = end.tv_sec;
+    int end_micro = end.tv_usec;
+    if(gap>999999){
+        gap_second = gap-(gap%1000000);
+        gap_microsecond = gap%1000000;
+    }else{
+        gap_microsecond = gap;
+    }
+    if(end_sec-start_sec>gap_second){
+        return 1;
+    }else if(end_sec-start_sec==gap_second){
+        if(end_micro-start_micro>gap_microsecond){
+            return 1;
+        }else if(end_micro-start_micro==gap_microsecond){
+            return 0;
+        }else{
+            return -1;
+        }
+    }else{
+        return -1;
+    }
+
+}
 
 
 /* a helper function for scheduler_maintenance.
@@ -168,9 +218,9 @@ Responsible for:
 void scheduler_maintenance() {
     //first check if the thread used up its time slice
 	int p =  SCHEDULER->current_tcb->priority;
-    TIME_SLICE = SCHEDULER->priority_time_slices[p];
+     int time_slice = SCHEDULER->priority_time_slices[p];
     tcb* current_running = SCHEDULER->current_tcb;
-    if(current_time()-current_running->start_time>=TIME_SLICE){
+    if(time_compare(current_time(),current_running->last_yield_time,time_slice)!=-1){
         my_pthread_yield();
     }
     //loop through all the queue and check for deletion and promotion
