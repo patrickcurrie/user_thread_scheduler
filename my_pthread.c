@@ -7,6 +7,7 @@
 /* Globals */
 scheduler * SCHEDULER;
 int NUMBER_LEVELS;
+int NUMBER_LOCKS;
 int TIME_SLICE;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
@@ -108,8 +109,11 @@ void init_scheduler() {
 		queue_init(&(SCHEDULER->multi_level_priority_queue[i]));
 	}
 
-	SCHEDULER->wait_queue = malloc(sizeof(queue));
-	queue_init(SCHEDULER->wait_queue);
+	SCHEDULER->wait_queue = malloc(sizeof(queue) * NUMBER_LOCKS);
+	for (int i = 0; i < NUMBER_LOCKS; i++)
+	{
+		queue_init(&(SCHEDULER->wait_queue[i]))
+	}
 	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb)); // Set when context is swapped out of scheduler context.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
