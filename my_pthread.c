@@ -285,7 +285,9 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 int my_pthread_yield() {
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
-	tcb_node->state = READY;
+	if (tcb_node->state != TERMINATED) {
+		tcb_node->state = READY;
+	}
 	schedule_thread(tcb_node, tcb_node->priority);
     //check to see if we need to move on to the next queue
     if(HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
@@ -299,10 +301,14 @@ int my_pthread_yield() {
         SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
     }
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
+	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
+		my_pthread_yield();
+		return 0;
+	}
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
-    HAS_RUN++;
+    	HAS_RUN++;
 	return 0;
 };
 
