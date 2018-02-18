@@ -7,7 +7,7 @@
 /* Globals */
 scheduler * SCHEDULER;
 int NUMBER_LEVELS;
-int NUMBER_LOCKS;
+int NUMBER_LOCKS = 0;
 int TIME_SLICE;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
