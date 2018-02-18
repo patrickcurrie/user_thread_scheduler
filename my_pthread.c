@@ -9,6 +9,7 @@ scheduler * SCHEDULER;
 int NUMBER_LEVELS;
 int NUMBER_LOCKS = 0;
 int TIME_SLICE;
+int HAS_RUN=0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
 /* Static internal functions */
@@ -96,9 +97,9 @@ tcb *peek(queue * q) {
 
 /* Get current time */
 struct timeval current_time() {
-	struct timeval *tv;
-	gettimeofday(tv, NULL);
-	return *tv;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv;
 }
 
 /* Initialize scheduler */
@@ -121,6 +122,41 @@ void init_scheduler() {
 	alarm(1); // Maybe this should be settimer? Need a way to fire SIGALRM signal every n seconds.
 }
 
+/*A helper function for maintain to compare time*/
+int time_compare
+
+
+/* a helper function for scheduler_maintenance.
+ * Check to see if the thread need to be promote to a higher queue or a lower
+ * return 1 to promote to a higher queue
+ * return 0 to stay in the original queue
+ * return -1 to degrade to a lower queue
+ * */
+int promotion(tcb* tcb_node){
+
+}
+
+/* a helper function for maintenance*/
+void remove_tcb(queue* current_queue, tcb* prev, tcb* current){
+    if(current_queue->size==1){
+        current_queue->tail=NULL;
+        current_queue->tail=NULL;
+        current=NULL;
+        prev = current;
+    }
+    if (current!=prev) { //check if this is the head of the queue
+        current = current->next_tcb;
+        prev = current;
+        current_queue->head = current;
+    }else if(current==current_queue->tail){//check if this is the tail of the queue
+        current=NULL;
+        prev->next_tcb=NULL;
+        current_queue->tail = prev;
+    }else{
+        current = current->next_tcb;
+        prev->next_tcb = current;
+    }
+}
 /*
 Maintenance done on the multi-level priority queue to handle the SIGALRM signal.
 
@@ -130,7 +166,52 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
-	printf("Test\n");
+    //first check if the thread used up its time slice
+	int p =  SCHEDULER->current_tcb->priority;
+    TIME_SLICE = SCHEDULER->priority_time_slices[p];
+    tcb* current_running = SCHEDULER->current_tcb;
+    if(current_time()-current_running->start_time>=TIME_SLICE){
+        my_pthread_yield();
+    }
+    //loop through all the queue and check for deletion and promotion
+    for(int i=0; i<NUMBER_LEVELS;i++){
+        int size = SCHEDULER->multi_level_priority_queue[i].size;
+        queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
+        tcb* current = current_queue->head;
+        tcb* prev = current_queue->head;
+        while(current!=NULL){
+            //first check if the state of any tcb is terminated, if yes release the recourse
+            if(current->state==TERMINATED){
+                tcb* tmp = current;
+                remove_tcb(current_queue,prev,current);
+                current_queue->size--;
+                free(tmp);
+            }else if (promotion(current)==1){ //to a higher level queue
+                if(p!=0){
+                    tcb* tmp = current;
+                    remove_tcb(current_queue,prev,current);
+                    current_queue->size--;
+                    enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
+                    SCHEDULER->multi_level_priority_queue[p+1].size++;
+                    tmp->priority++;
+                }
+            }else if(promotion(current)==-1){
+                if(p!=NUMBER_LEVELS-1){
+                    tcb* tmp = current;
+                    remove_tcb(current_queue,prev,current);
+                    current_queue->size--;
+                    enqueue(&SCHEDULER->multi_level_priority_queue[p-1],tmp);
+                    SCHEDULER->multi_level_priority_queue[p-1].size++;
+                    tmp->priority--;
+                }
+            }else{
+                prev = current;
+                current = current->next_tcb;
+            }
+        }
+
+    }
+
 }
 
 /* create a new thread */
@@ -156,11 +237,22 @@ int my_pthread_yield() {
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	tcb_node->state = READY;
 	schedule_thread(tcb_node, tcb_node->priority);
-	SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+    //check to see if we need to move on to the next queue
+    if(HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
+        HAS_RUN=0; //running a new queue set the counter to 0
+        if(current_priority==NUMBER_LEVELS-1){// this is the lowest priority
+            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
+        }else{
+            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
+        }
+    }else{
+        SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
+    }
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
+    HAS_RUN++;
 	return 0;
 };
 
