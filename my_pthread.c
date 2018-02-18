@@ -109,11 +109,7 @@ void init_scheduler() {
 		queue_init(&(SCHEDULER->multi_level_priority_queue[i]));
 	}
 
-	SCHEDULER->wait_queue = malloc(sizeof(queue) * NUMBER_LOCKS);
-	for (int i = 0; i < NUMBER_LOCKS; i++)
-	{
-		queue_init(&(SCHEDULER->wait_queue[i]))
-	}
+	SCHEDULER->wait_queues = NULL; // New wait_queue is malloced in my my_pthread_mutex_init function.
 	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb)); // Set when context is swapped out of scheduler context.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
@@ -179,6 +175,16 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 
 /* initial the mutex lock */
 int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
+	if (NUMBER_LOCKS == 0) {
+		SCHEDULER->wait_queues = malloc(sizeof(queue));
+		NUMBER_LOCKS++;
+	} else {
+		SCHEDULER->wait_queues = realloc(SCHEDULER->wait_queues, sizeof(queue) * ++NUMBER_LOCKS);
+	}
+	my_pthread_mutex_t *mutex = malloc(sizeof(my_pthread_mutex_t));
+	mutex->lock_owner = NULL;
+	mutex->lock_wait_queue = &(SCHEDULER->wait_queues[NUMBER_LOCKS - 1]); // This is this locks wait queue.
+
 	return 0;
 };
 
