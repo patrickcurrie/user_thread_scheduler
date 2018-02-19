@@ -7,9 +7,9 @@
 /* Globals */
 scheduler * SCHEDULER;
 int SCHEDULER_INIT = 0;
-int NUMBER_LEVELS;
+int NUMBER_LEVELS = 3;
 int NUMBER_LOCKS = 0;
-int TIME_SLICE;
+int TIME_SLICE = 5000;
 int HAS_RUN=0;
 int START = 0;
 int CYCLE = 0;
@@ -40,6 +40,7 @@ static int schedule_thread(tcb * tcb_node, int priority) {
 	if (priority < 0 || priority > NUMBER_LEVELS - 1) {
 		return -1; // Error invalid priority.
 	}
+    printf("in thread\n");
 	tcb_node->state = READY;
 	tcb_node->priority = priority;
 	enqueue(&(SCHEDULER->multi_level_priority_queue[priority]), tcb_node);
@@ -143,7 +144,6 @@ void signal_handler(){
    
     if(first_thread == 0) return;
         if(START==0){
-            printf("in start\n");
                 START=1;
                 
                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
@@ -152,21 +152,31 @@ void signal_handler(){
                 setcontext(&SCHEDULER->current_tcb->context);
                 HAS_RUN++;
         }
-        printf("after if\n");
+        printf("a\n");
         sigset_t block;
+        printf("b\n");
         sigemptyset(&block);
+        printf("c\n");
         sigaddset(&block, SIGALRM);
+        printf("d\n");
         sigprocmask(SIG_BLOCK, &block, NULL);
+        printf("e\n");
         if(CYCLE == 5){
                 CYCLE=0;
                 scheduler_maintenance();
         }
         //check if it need to yield
+        printf("f\n");
         if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){
+            printf("before yield\n");
                 my_pthread_yield();
+                 printf("after yield\n");
         }
+        printf("g\n");
         CYCLE++;
+        printf("h\n");
         sigprocmask(SIG_UNBLOCK, &block, NULL);
+        printf("signal end\n");
 }
 
 /*A helper function for maintain to compare time*/
@@ -305,7 +315,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		init_scheduler();
         SCHEDULER_INIT = 1;
 	}
-    printf("got here\n");
+    printf("got here in create\n");
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
@@ -318,6 +328,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_flags = 0;
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
+    
         schedule_thread(tcb_node, 0);
     if(first_thread == 0) {
         first_thread = 1;
