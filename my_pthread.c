@@ -6,6 +6,7 @@
 
 /* Globals */
 scheduler * SCHEDULER;
+int SCHEDULER_INIT = 0;
 int NUMBER_LEVELS;
 int NUMBER_LOCKS = 0;
 int TIME_SLICE;
@@ -112,13 +113,12 @@ void init_scheduler() {
 	}
 
 	SCHEDULER->wait_queues = NULL; // New wait_queue is malloced in my my_pthread_mutex_init function.
-	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb)); // Set when context is swapped out of scheduler context.
+	SCHEDULER->main_tcb = NULL; // Set only after first call to my_pthread_create funtion.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
 	for (int i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
-        execute();
 }
 
 /*a function that do nothing but blocks signals */
@@ -295,6 +295,9 @@ void scheduler_maintenance() {
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
+	if (SCHEDULER_INIT == 0) { // Init scheduler if this is first time my_pthread_create is called.
+		init_scheduler();
+	}
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
@@ -308,6 +311,18 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
         schedule_thread(tcb_node, 0);
+	if (SCHEDULER_INIT == 0) {
+		// Schedule main context but don't run it.
+		tcb *tcb_main_node = malloc(sizeof(tcb));
+		tcb tcb_main_node->tid = 0;
+		if (getcontext(&(tcb_main_node->context)) != 0) {
+			return -1; // Error getthing context.
+		}
+		// set context to thread that called my_pthread_create function.
+		tcb_main_node->context = *(tcb_main_node->context.uc_link);
+		schedule_thread(tcb_main_node, 0); // Schedule main thread.
+                SCHEDULER_INIT = 1:
+	}
 	return 0;
 }
 
@@ -322,18 +337,18 @@ int my_pthread_yield() {
 		tcb_node->state = READY;
 	}
 	schedule_thread(tcb_node, tcb_node->priority);
-    //check to see if we need to move on to the next queue
-    if(HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
-        HAS_RUN=0; //running a new queue set the counter to 0
-        if(current_priority==NUMBER_LEVELS-1){// this is the lowest priority
-            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
-        }else{
-            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
+    	//check to see if we need to move on to the next queue
+    	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size) {
+        	HAS_RUN=0; //running a new queue set the counter to 0
+                if (current_priority==NUMBER_LEVELS-1) {// this is the lowest priority
+        		SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
+                } else {
+            		SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
+                }
+        } else {
+                SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
         }
-    }else{
-        SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
-    }
-	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
+	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
 	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
 		my_pthread_yield();
 		return 0;

@@ -58,8 +58,8 @@ typedef struct queue {
 typedef struct {
         queue *multi_level_priority_queue;
         queue *wait_queues;
-        tcb *scheduler_tcb; // So  we know where to to return to.
         tcb *current_tcb;
+        tcb *main_tcb; // Context that calls my_pthread_create function
         int *priority_time_slices;
 } scheduler;
 
