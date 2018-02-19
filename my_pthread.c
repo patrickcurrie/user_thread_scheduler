@@ -356,10 +356,11 @@ int my_pthread_yield() {
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
         SCHEDULER->current_tcb->recent_start_time = current_time();
-	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
-    	HAS_RUN++;
+        HAS_RUN++;
         signal(SIGALRM, my_pthread_yield);
         signal(SIGVTALRM,scheduler_maintenance);
+        HAS_RUN++;
+	setcontext(&(SCHEDULER->current_tcb->context));
 	return 0;
 };
 
