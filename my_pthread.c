@@ -263,48 +263,138 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
-        int p =  SCHEDULER->current_tcb->priority;
-     int time_slice = SCHEDULER->priority_time_slices[p];
-    tcb* current_running = SCHEDULER->current_tcb;
-    //loop through all the queue and check for deletion and promotion
-    int i=0;
-    for(i=0; i<NUMBER_LEVELS;i++){
-        int size = SCHEDULER->multi_level_priority_queue[i].size;
-        queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
-        tcb* current = current_queue->head;
-        tcb* prev = current_queue->head;
-        while(current!=NULL){
-            //first check if the state of any tcb is terminated, if yes release the recourse
-            if(current->state==TERMINATED){
-                tcb* tmp = current;
-                remove_tcb(current_queue,prev,current);
-                current_queue->size--;
-                free(tmp);
-            }else if (promotion(current)==1){ //to a higher level queue
-                if(p!=0){
+    int p =  SCHEDULER->current_tcb->priority;
+        //create an array to store 3 oldest thread
+        tcb* oldest[6];
+        //set all the 6 slot to 0
+        int index=0;
+        for(index = 0; index<6; index++){
+                oldest[index]=NULL;
+        }
+        //loop through all the queue and check for deletion and promotion
+        int i=0;
+        for(i=0; i<NUMBER_LEVELS;i++){
+                int size = SCHEDULER->multi_level_priority_queue[i].size;
+                queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
+                tcb* current = current_queue->head;
+                tcb* prev = current_queue->head;
+                while(current!=NULL){
+                        //first check if the state of any tcb is terminated, if yes release the recourse
+                        if(current->state==TERMINATED){
+                                tcb* tmp = current;
+                                remove_tcb(current_queue,prev,current);
+                                current_queue->size--;
+                                free(tmp);
+
+                /*if(p!=0){
                     tcb* tmp = current;
                     remove_tcb(current_queue,prev,current);
                     current_queue->size--;
                     enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
                     SCHEDULER->multi_level_priority_queue[p+1].size++;
                     tmp->priority++;
+                }*/
+                        }else if(promotion(current)==-1){
+                                if(p!=NUMBER_LEVELS-1){
+                                        tcb* tmp = current;
+                                        remove_tcb(current_queue,prev,current);
+                                        current_queue->size--;
+                                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1],tmp);
+                                        SCHEDULER->multi_level_priority_queue[p-1].size++;
+                                        tmp->priority--;
+                                }
+                        }else{
+                                prev = current;
+                                current = current->next_tcb;
+                        }
                 }
-            }else if(promotion(current)==-1){
-                if(p!=NUMBER_LEVELS-1){
-                    tcb* tmp = current;
-                    remove_tcb(current_queue,prev,current);
-                    current_queue->size--;
-                    enqueue(&SCHEDULER->multi_level_priority_queue[p-1],tmp);
-                    SCHEDULER->multi_level_priority_queue[p-1].size++;
-                    tmp->priority--;
+
+        }
+        for(i=0; i<NUMBER_LEVELS;i++){
+                int size = SCHEDULER->multi_level_priority_queue[i].size;
+                queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
+                tcb* current = current_queue->head;
+                tcb* prev = current_queue->head;
+                while(current!=NULL){
+                        //first check if the state of any tcb is terminated, if yes release the recourse
+                        if (oldest[1]==NULL||oldest[3]==NULL||oldest[5]==NULL){ //to a higher level queue
+                                if(oldest[1]==NULL){
+                                        oldest[0]=prev;
+                                        oldest[1] = current;
+                                }else if(oldest[3]==NULL){
+                                        oldest[2] = prev;
+                                        oldest[3] = current;
+                                }else{
+                                        oldest[4] = prev;
+                                        oldest[5] = current;
+                                }
+                                prev = current;
+                                current = current->next_tcb;
+
+                                /*if(p!=0){
+                                    tcb* tmp = current;
+                                    remove_tcb(current_queue,prev,current);
+                                    current_queue->size--;
+                                    enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
+                                    SCHEDULER->multi_level_priority_queue[p+1].size++;
+                                    tmp->priority++;
+                                }*/
+                        }else if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[5]->initial_start_time,<)>0){
+                                if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[3]->initial_start_time,<)>0){
+                                        if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0) {
+                                                oldest[0] = prev;
+                                                oldest[1] = current;
+                                        }else{
+                                                oldest[2] = prev;
+                                                oldest[3] = current;
+                                        }
+                                }else{
+                                        oldest[4] = prev;
+                                        oldest[5] = current;
+                                }
+                                prev = current;
+                                current = current->next_tcb;
+                        } else{
+                                prev = current;
+                                current = current->next_tcb;
+                        }
                 }
-            }else{
-                prev = current;
-                current = current->next_tcb;
-            }
+
+        }
+        if(oldest[5]!=NULL){
+                if(oldest[5]->priority!=0) {
+                        tcb *tmp = oldest[5];
+                        p = tmp->priority;
+                        remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[4], oldest[5]);
+                        SCHEDULER->multi_level_priority_queue[p].size--;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        tmp->priority++;
+                }
+        }
+        if(oldest[3]!=NULL){
+                if(oldest[3]->priority!=0) {
+                        tcb *tmp = oldest[3];
+                        p = tmp->priority;
+                        remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[2], oldest[3]);
+                        SCHEDULER->multi_level_priority_queue[p].size--;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        tmp->priority++;
+                }
+        }
+        if(oldest[1]!=NULL){
+                if(oldest[1]->priority!=0) {
+                        tcb *tmp = oldest[1];
+                        p = tmp->priority;
+                        remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[0], oldest[1]);
+                        SCHEDULER->multi_level_priority_queue[p].size--;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        tmp->priority++;
+                }
         }
 
-    }
         return;
 }
 
