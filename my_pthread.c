@@ -298,6 +298,7 @@ void scheduler_maintenance() {
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
+    
 	if (SCHEDULER_INIT == 0) { // Init scheduler if this is first time my_pthread_create is called.
 		init_scheduler();
         SCHEDULER_INIT = 1;
@@ -308,7 +309,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb *tcb_node = malloc(sizeof(tcb));
 	tcb_node->tid = *thread;
 	if (getcontext(&(tcb_node->context)) != 0) {
-		return -1; // Error getthing context.
+		return -1; // Error getthing context
 	}
 	// Configure context stack.
 	tcb_node->context.uc_stack.ss_sp = malloc(STACK_SIZE);
@@ -316,7 +317,10 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
         schedule_thread(tcb_node, 0);
-    first_thread = 1;
+    if(first_thread == 0) {
+        first_thread = 1;
+        execute();
+    }
 	/*if (SCHEDULER_INIT == 0) {
 		// Schedule main context but don't run it.
 		tcb *tcb_main_node = malloc(sizeof(tcb));
