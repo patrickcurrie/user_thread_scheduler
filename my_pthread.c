@@ -21,7 +21,7 @@ thread to run, and cleanup after the thread finishes.
 static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), void *arg) {
 	SCHEDULER->current_tcb = tcb_node;
 	tcb_node->state = RUNNING;
-	tcb_node->initial_start_time = current_time();
+	tcb_node->start_time = current_time();
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;
@@ -106,36 +106,41 @@ struct timeval current_time() {
 void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
 	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUMBER_LEVELS);
-	for (int i = 0; i < NUMBER_LEVELS; i++) {
+    int i=0;
+	while (i < NUMBER_LEVELS) {
 		queue_init(&(SCHEDULER->multi_level_priority_queue[i]));
+        i++;
 	}
 
 	SCHEDULER->wait_queues = NULL; // New wait_queue is malloced in my my_pthread_mutex_init function.
 	SCHEDULER->scheduler_tcb = malloc(sizeof(tcb)); // Set when context is swapped out of scheduler context.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
-	for (int i = 0; i < NUMBER_LEVELS; i++) {
+    i=0;
+	while (i < NUMBER_LEVELS) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
+        i++;
 	}
-        execute();
+
 }
 
 void execute(){
     while(1==1){
-        schedule_handler();
+       // schedule_handler();
         scheduler_maintenance();
     }
     return;
 }
 
 void schedule_handler(){
-        struct timeval start_time = current_time();
-        while(time_compare(start_time,current_time(),100000)==-1){
-                if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){
-                my_pthread_yield();
-                }
+    /*
+    struct timeval start_time = current_time();
+    while(time_compare(start_time,current_time(),100000)==-1){
+        if(){
+
         }
-        return;
+    }
+    */
 }
 
 
@@ -225,7 +230,8 @@ void scheduler_maintenance() {
         my_pthread_yield();
     }
     //loop through all the queue and check for deletion and promotion
-    for(int i=0; i<NUMBER_LEVELS;i++){
+    int i=0;
+    while(i<NUMBER_LEVELS){
         int size = SCHEDULER->multi_level_priority_queue[i].size;
         queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
         tcb* current = current_queue->head;
@@ -259,6 +265,7 @@ void scheduler_maintenance() {
                 prev = current;
                 current = current->next_tcb;
             }
+            i++;
         }
 
     }
@@ -286,9 +293,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 int my_pthread_yield() {
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
-	if (tcb_node->state != TERMINATED) {
-		tcb_node->state = READY;
-	}
+	tcb_node->state = READY;
 	schedule_thread(tcb_node, tcb_node->priority);
     //check to see if we need to move on to the next queue
     if(HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
@@ -302,15 +307,10 @@ int my_pthread_yield() {
         SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
     }
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
-	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
-		my_pthread_yield();
-		return 0;
-	}
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
-        SCHEDULER->current_tcb->recent_start_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
-    	HAS_RUN++;
+    HAS_RUN++;
 	return 0;
 };
 
@@ -342,30 +342,32 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
     int current_priority = SCHEDULER->current_tcb ->priority;
-	tcb *tcb_node = (tcb*) peak(&(SCHEDULER->multi_level_priority_queue[current_priority]));
-    while (_sync_lock_test_and_set(mutex -> val) == LOCKED)
+	tcb *tcb_node = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+    while (_sync_lock_test_and_set(&(mutex -> val), 1))
     {
         my_pthread_mutex_t *another_lock;
         my_pthread_mutex_init(another_lock, NULL);
         my_pthread_mutex_lock(another_lock);
-        if (mutex -> val == LOCKED)
+        //spin_lock(another_lock);
+        if (mutex -> lock_owner == tcb_node->tid)
         {
-            enqueue(mutex -> lock_wait_queue, tcb_node); 
+            enqueue(mutex -> lock_wait_queue, tcb_node); // Put self in queue
             my_pthread_mutex_unlock(another_lock);
             while(mutex -> lock_owner != tcb_node->tid){continue;}
- 
+            //spin_unlock(another_lock);
+            //Thread.sleep(); // Put self to sleep
         }
         else
         {
             my_pthread_mutex_unlock(another_lock);
         }
     }
+    // Got the lock
 	return 0;
 };
 
 /* release the mutex lock */
 int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
-
     my_pthread_mutex_t *another_lock;
     my_pthread_mutex_init(another_lock, NULL);
     my_pthread_mutex_lock(another_lock);
@@ -391,6 +393,11 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 int main() {
 	// Test code here
 	init_scheduler();
+    my_pthread_mutex_t *another_lock;
+    my_pthread_mutex_init(another_lock, NULL);
+    my_pthread_mutex_lock(another_lock);
+    my_pthread_mutex_unlock(another_lock);
+    my_pthread_mutex_destroy(another_lock);
 	sleep(10);
 	return 0;
 }
