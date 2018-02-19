@@ -41,10 +41,15 @@ typedef struct threadControlBlock {
         struct threadControlBlock *next_tcb;
 } tcb;
 
+typedef struct queue {
+	tcb *head;
+	tcb *tail;
+	int size;
+} queue;
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
 	/* add something here */
-        mypthread_t lock_owner;          // Thread owning the mutex
+        my_pthread_t lock_owner;          // Thread owning the mutex
         int val;
         queue *lock_wait_queue;
 } my_pthread_mutex_t;
@@ -53,11 +58,7 @@ typedef struct my_pthread_mutex_t {
 
 // Feel free to add your own auxiliary data structures
 
-typedef struct queue {
-	tcb *head;
-	tcb *tail;
-	int size;
-} queue;
+
 
 typedef struct {
         queue *multi_level_priority_queue;
@@ -112,3 +113,4 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
 
 
 #endif
+

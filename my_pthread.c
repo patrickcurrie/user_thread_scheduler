@@ -108,7 +108,8 @@ struct timeval current_time() {
 void init_scheduler() {
 	SCHEDULER = malloc(sizeof(scheduler));
 	SCHEDULER->multi_level_priority_queue = malloc(sizeof(queue) * NUMBER_LEVELS);
-	for (int i = 0; i < NUMBER_LEVELS; i++) {
+    int i;
+	for (i = 0; i < NUMBER_LEVELS; i++) {
 		queue_init(&(SCHEDULER->multi_level_priority_queue[i]));
 	}
 
@@ -116,7 +117,7 @@ void init_scheduler() {
 	SCHEDULER->main_tcb = NULL; // Set only after first call to my_pthread_create funtion.
 	SCHEDULER->current_tcb = NULL; // New tcb malloced in my_pthread_create function.
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
-	for (int i = 0; i < NUMBER_LEVELS; i++) {
+	for (i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
 }
@@ -128,11 +129,12 @@ void block(){}
 void execute(){
         if(SCHEDULER->current_tcb==NULL){
                 int indicate = 0;
-                for(int i=0; i<NUMBER_LEVELS;i++){
+                int i;
+                for(i=0; i<NUMBER_LEVELS;i++){
                         if(SCHEDULER->multi_level_priority_queue[i].size>0){
                                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[i].head;
                                 indicate=1;
-                                setcontext(SCHEDULER->current_tcb->context);
+                                setcontext(&SCHEDULER->current_tcb->context);
                         }
                 }
                 if(indicate==0){
@@ -251,7 +253,8 @@ void scheduler_maintenance() {
         my_pthread_yield();
     }
     //loop through all the queue and check for deletion and promotion
-    for(int i=0; i<NUMBER_LEVELS;i++){
+    int i=0;
+    for(i=0; i<NUMBER_LEVELS;i++){
         int size = SCHEDULER->multi_level_priority_queue[i].size;
         queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
         tcb* current = current_queue->head;
@@ -314,14 +317,14 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	if (SCHEDULER_INIT == 0) {
 		// Schedule main context but don't run it.
 		tcb *tcb_main_node = malloc(sizeof(tcb));
-		tcb tcb_main_node->tid = 0;
+		tcb_main_node->tid = 0;
 		if (getcontext(&(tcb_main_node->context)) != 0) {
 			return -1; // Error getthing context.
 		}
 		// set context to thread that called my_pthread_create function.
 		tcb_main_node->context = *(tcb_main_node->context.uc_link);
 		schedule_thread(tcb_main_node, 0); // Schedule main thread.
-                SCHEDULER_INIT = 1:
+                SCHEDULER_INIT = 1;
 	}
 	return 0;
 }
@@ -370,7 +373,7 @@ void my_pthread_exit(void *value_ptr) {
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	if (tcb_node->state != TERMINATED) {
         if(value_ptr != NULL)
-            value_ptr = current_tcb -> return_value;
+            value_ptr = tcb_node -> return_value;
 		tcb_node->state = TERMINATED;
 	}
     else return;
@@ -383,7 +386,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
     int flag =0;
     for(i=0; i<NUMBER_LEVELS;i++)
     {
-        tcb* node = SCHEDULER->multi_level_priority_queue[i]->head;
+        tcb* node = SCHEDULER->multi_level_priority_queue[i].head;
         if(node != NULL)
         {
             if(node -> tid == thread)
@@ -394,8 +397,8 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
                 }
                 flag = 1;
             }
-            else node = SCHEDULER->multi_level_priority_queue[i]->head->next;
-            while(node != SCHEDULER->multi_level_priority_queue[i]->head)
+            else node = SCHEDULER->multi_level_priority_queue[i].head->next_tcb;
+            while(node != SCHEDULER->multi_level_priority_queue[i].head)
             {
                 if(node -> tid == thread)
                 {
@@ -406,7 +409,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
                     flag = 1;
                     break;
                 }
-                else node = SCHEDULER->multi_level_priority_queue[i]->head->next;
+                else node = SCHEDULER->multi_level_priority_queue[i].head->next_tcb;
             }
             if(flag) break;
         }
