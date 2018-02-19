@@ -16,9 +16,6 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#define LOCKED 1
-#define UNLOCKED 0
-
 typedef uint my_pthread_t;
 
 typedef enum thread_state {
@@ -34,13 +31,19 @@ typedef struct threadControlBlock {
         ucontext_t context;
         enum thread_state state;
         int priority;
-        struct timeval start_time;
+        struct timeval initial_start_time;
+	struct timeval recent_start_time;
         struct timeval last_yield_time;
         void *return_value;
         struct threadControlBlock *next_tcb;
 } tcb;
 
-
+/* mutex struct definition */
+typedef struct my_pthread_mutex_t {
+	/* add something here */
+        mypthread_t lock_owner;          // Thread owning the mutex
+        queue *lock_wait_queue;
+} my_pthread_mutex_t;
 
 /* define your data structures here: */
 
@@ -51,14 +54,6 @@ typedef struct queue {
 	tcb *tail;
 	int size;
 } queue;
-
-/* mutex struct definition */
-typedef struct my_pthread_mutex_t {
-	/* add something here */
-    int val;
-    my_pthread_t lock_owner;          // Thread owning the mutex
-    queue *lock_wait_queue;
-} my_pthread_mutex_t;
 
 typedef struct {
         queue *multi_level_priority_queue;
@@ -86,8 +81,6 @@ struct timeval current_time();
 void init_scheduler();
 
 void scheduler_maintenance();
-
-void schedule_handler();
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t *thread, pthread_attr_t *attr, void *(*function)(void*), void *arg);
