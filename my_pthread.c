@@ -117,7 +117,7 @@ void init_scheduler() {
 	for (int i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
-
+        execute();
 }
 
 void execute(){
@@ -129,12 +129,13 @@ void execute(){
 }
 
 void schedule_handler(){
-    struct timeval start_time = current_time();
-    while(time_compare(start_time,current_time(),100000)==-1){
-        if(){
-
+        struct timeval start_time = current_time();
+        while(time_compare(start_time,current_time(),100000)==-1){
+                if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){
+                my_pthread_yield();
+                }
         }
-    }
+        return;
 }
 
 
@@ -307,6 +308,7 @@ int my_pthread_yield() {
 	}
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
+        SCHEDULER->current_tcb->recent_start_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
     	HAS_RUN++;
 	return 0;

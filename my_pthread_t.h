@@ -32,6 +32,7 @@ typedef struct threadControlBlock {
         enum thread_state state;
         int priority;
         struct timeval initial_start_time;
+	struct timeval recent_start_time;
         struct timeval last_yield_time;
         void *return_value;
         struct threadControlBlock *next_tcb;
