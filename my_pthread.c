@@ -287,6 +287,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_flags = 0;
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
+	schedule_thread(tcb_node, 0);
 	return 0;
 }
 
@@ -298,17 +299,17 @@ int my_pthread_yield() {
 		tcb_node->state = READY;
 	}
 	schedule_thread(tcb_node, tcb_node->priority);
-    //check to see if we need to move on to the next queue
-    if(HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
-        HAS_RUN=0; //running a new queue set the counter to 0
-        if(current_priority==NUMBER_LEVELS-1){// this is the lowest priority
-            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
-        }else{
-            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
-        }
-    }else{
-        SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
-    }
+    	//check to see if we need to move on to the next queue
+    	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size) {
+        	HAS_RUN=0; //running a new queue set the counter to 0
+        	if (current_priority==NUMBER_LEVELS-1) {// this is the lowest priority
+        	SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
+        	} else {
+			SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
+        	}
+	} else {
+ 		SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
+	}
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->scheduler_tcb->context)
 	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
 		my_pthread_yield();
