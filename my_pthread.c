@@ -15,6 +15,8 @@ int START = 0;
 int CYCLE = 0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
+int first_thread = 0;
+
 /* Static internal functions */
 
 /*
@@ -124,25 +126,31 @@ void init_scheduler() {
         START  = 0;
         //setup signal
         struct itimerval value_yield,ovalue; //(1)
-        signal(SIGALRM, signal_handler);
+        signal(SIGALRM, signal_handler); 
         value_yield.it_value.tv_sec = 0;
         value_yield.it_value.tv_usec = 25000;
         value_yield.it_interval.tv_sec = 0;
         value_yield.it_interval.tv_usec = 25000;
         setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
+        printf("before loop\n");
         for(;;);
+        printf("after loop\n");
 }
 
 void signal_handler(){
+   
+    if(first_thread == 0) return;
         if(START==0){
+            printf("in start\n");
                 START=1;
+                
                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
                 SCHEDULER->current_tcb->state = RUNNING;
                 SCHEDULER->current_tcb->recent_start_time = current_time();
                 setcontext(&SCHEDULER->current_tcb->context);
                 HAS_RUN++;
         }
-
+        printf("after if\n");
         sigset_t block;
         sigemptyset(&block);
         sigaddset(&block, SIGALRM);
@@ -292,7 +300,9 @@ void scheduler_maintenance() {
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
 	if (SCHEDULER_INIT == 0) { // Init scheduler if this is first time my_pthread_create is called.
 		init_scheduler();
+        SCHEDULER_INIT = 1;
 	}
+    printf("got here\n");
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
@@ -306,7 +316,8 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
         schedule_thread(tcb_node, 0);
-	if (SCHEDULER_INIT == 0) {
+    first_thread = 1;
+	/*if (SCHEDULER_INIT == 0) {
 		// Schedule main context but don't run it.
 		tcb *tcb_main_node = malloc(sizeof(tcb));
 		tcb_main_node->tid = 0;
@@ -317,7 +328,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		tcb_main_node->context = *(tcb_main_node->context.uc_link);
 		schedule_thread(tcb_main_node, 0); // Schedule main thread.
                 SCHEDULER_INIT = 1;
-	}
+	}*/
 	return 0;
 }
 
@@ -407,17 +418,25 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 
 /* initial the mutex lock */
 int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
+    
+    if (SCHEDULER_INIT == 0) {
+        init_scheduler();
+        SCHEDULER_INIT =1;
+	}
+    printf("got here aaaaaa\n");
 	if (NUMBER_LOCKS == 0) {
+        printf("got here\n");
 		SCHEDULER->wait_queues = malloc(sizeof(queue));
 		NUMBER_LOCKS++;
 	} else {
 		SCHEDULER->wait_queues = realloc(SCHEDULER->wait_queues, sizeof(queue) * ++NUMBER_LOCKS);
 	}
+    printf("got here2\n");
 	mutex = malloc(sizeof(my_pthread_mutex_t));
     mutex -> val = UNLOCKED;
 	mutex->lock_owner = 0;
 	mutex->lock_wait_queue = &(SCHEDULER->wait_queues[NUMBER_LOCKS - 1]); // This is this locks wait queue.
-
+    
 	return 0;
 };
 
@@ -480,9 +499,3 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
-int main() {
-	// Test code here
-	init_scheduler();
-	sleep(10);
-	return 0;
-}
