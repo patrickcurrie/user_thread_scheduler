@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+#define LOCKED 1
+#define UNLOCKED 0
+
+
 typedef uint my_pthread_t;
 
 typedef enum thread_state {
@@ -41,8 +45,9 @@ typedef struct threadControlBlock {
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
 	/* add something here */
-        mypthread_t lock_owner;          // Thread owning the mutex
-        queue *lock_wait_queue;
+    int val;
+    mypthread_t lock_owner;          // Thread owning the mutex
+    queue *lock_wait_queue;
 } my_pthread_mutex_t;
 
 /* define your data structures here: */

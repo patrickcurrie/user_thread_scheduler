@@ -331,8 +331,9 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 	} else {
 		SCHEDULER->wait_queues = realloc(SCHEDULER->wait_queues, sizeof(queue) * ++NUMBER_LOCKS);
 	}
-	my_pthread_mutex_t *mutex = malloc(sizeof(my_pthread_mutex_t));
-	mutex->lock_owner = NULL;
+	mutex = malloc(sizeof(my_pthread_mutex_t));
+    mutex -> val = UNLOCKED;
+	mutex->lock_owner = 0;
 	mutex->lock_wait_queue = &(SCHEDULER->wait_queues[NUMBER_LOCKS - 1]); // This is this locks wait queue.
 
 	return 0;
@@ -340,16 +341,50 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
+    int current_priority = SCHEDULER->current_tcb ->priority;
+	tcb *tcb_node = (tcb*) peak(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+    while (_sync_lock_test_and_set(mutex -> val) == LOCKED)
+    {
+        my_pthread_mutex_t *another_lock;
+        my_pthread_mutex_init(another_lock, NULL);
+        my_pthread_mutex_lock(another_lock);
+        if (mutex -> val == LOCKED)
+        {
+            enqueue(mutex -> lock_wait_queue, tcb_node); 
+            my_pthread_mutex_unlock(another_lock);
+            while(mutex -> lock_owner != tcb_node->tid){continue;}
+ 
+        }
+        else
+        {
+            my_pthread_mutex_unlock(another_lock);
+        }
+    }
 	return 0;
 };
 
 /* release the mutex lock */
 int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
+
+    my_pthread_mutex_t *another_lock;
+    my_pthread_mutex_init(another_lock, NULL);
+    my_pthread_mutex_lock(another_lock);
+    tcb *next_node =dequeue(mutex -> lock_wait_queue);
+    mutex -> val = UNLOCKED;
+    my_pthread_mutex_unlock(another_lock);
+    if (next_node != NULL)
+        mutex->lock_owner = next_node->tid;
 	return 0;
 };
 
 /* destroy the mutex */
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
+    tcb* node;
+    while((node = dequeue (mutex -> lock_wait_queue))!= NULL){
+        continue;
+    }
+    free(mutex -> lock_wait_queue);
+    free(mutex);
 	return 0;
 };
 
