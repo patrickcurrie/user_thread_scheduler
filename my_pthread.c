@@ -11,7 +11,8 @@ int NUMBER_LEVELS;
 int NUMBER_LOCKS = 0;
 int TIME_SLICE;
 int HAS_RUN=0;
-int MAINTAIN;
+int START = 0;
+int CYCLE = 0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
 
 /* Static internal functions */
@@ -27,7 +28,6 @@ static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), v
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;
-	scheduler_maintenance(); // Clean terminated thread from SCHEDULER->multi_level_priority_queue.
 }
 
 /*
@@ -120,42 +120,43 @@ void init_scheduler() {
 	for (i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
+        //first to run the first thread
+        START  = 0;
+        //setup signal
+        struct itimerval value_yield,ovalue; //(1)
+        signal(SIGALRM, signal_handler);
+        value_yield.it_value.tv_sec = 0;
+        value_yield.it_value.tv_usec = 25000;
+        value_yield.it_interval.tv_sec = 0;
+        value_yield.it_interval.tv_usec = 25000;
+        setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
+        for(;;);
 }
 
-/*a function that do nothing but blocks signals */
-void block(){}
-
-/*Wait until there is some thread can be scheduled*/
-void execute(){
-        if(SCHEDULER->current_tcb==NULL){
-                int indicate = 0;
-                int i;
-                for(i=0; i<NUMBER_LEVELS;i++){
-                        if(SCHEDULER->multi_level_priority_queue[i].size>0){
-                                SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[i].head;
-                                indicate=1;
-                                setcontext(&SCHEDULER->current_tcb->context);
-                        }
-                }
-                if(indicate==0){
-                        execute();
-                }
+void signal_handler(){
+        if(START==0){
+                START=1;
+                SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
+                SCHEDULER->current_tcb->state = RUNNING;
+                SCHEDULER->current_tcb->recent_start_time = current_time();
+                setcontext(&SCHEDULER->current_tcb->context);
+                HAS_RUN++;
         }
-        struct itimerval value_yield, value_maintain, ovalue; //(1)
-        signal(SIGALRM, my_pthread_yield);
-        signal(SIGVTALRM,scheduler_maintenance);
-        value_yield.it_value.tv_sec = 0;
-        value_yield.it_value.tv_usec = SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority];
-        value_yield.it_interval.tv_sec = 0;
-        value_yield.it_interval.tv_usec = SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority];
-        setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
-        value_maintain.it_value.tv_sec = 0;
-        value_maintain.it_value.tv_usec = MAINTAIN;
-        value_maintain.it_interval.tv_sec = 0;
-        value_maintain.it_interval.tv_usec = MAINTAIN;
-        setitimer(ITIMER_VIRTUAL, &value_maintain, &ovalue);
-        for(;;);
 
+        sigset_t block;
+        sigemptyset(&block);
+        sigaddset(&block, SIGALRM);
+        sigprocmask(SIG_BLOCK, &block, NULL);
+        if(CYCLE == 5){
+                CYCLE=0;
+                scheduler_maintenance();
+        }
+        //check if it need to yield
+        if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){
+                my_pthread_yield();
+        }
+        CYCLE++;
+        sigprocmask(SIG_UNBLOCK, &block, NULL);
 }
 
 /*A helper function for maintain to compare time*/
@@ -242,16 +243,9 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
-        //block signal
-        signal(SIGALRM, block);
-        signal(SIGVTALRM, block);
-    //first check if the thread used up its time slice
-	int p =  SCHEDULER->current_tcb->priority;
+        int p =  SCHEDULER->current_tcb->priority;
      int time_slice = SCHEDULER->priority_time_slices[p];
     tcb* current_running = SCHEDULER->current_tcb;
-    if(time_compare(current_time(),current_running->last_yield_time,time_slice)!=-1){
-        my_pthread_yield();
-    }
     //loop through all the queue and check for deletion and promotion
     int i=0;
     for(i=0; i<NUMBER_LEVELS;i++){
@@ -291,8 +285,6 @@ void scheduler_maintenance() {
         }
 
     }
-        signal(SIGALRM, my_pthread_yield);
-        signal(SIGVTALRM,scheduler_maintenance);
         return;
 }
 
@@ -332,8 +324,6 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
         //block signal
-        signal(SIGALRM, block);
-        signal(SIGVTALRM, block);
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	if (tcb_node->state != TERMINATED) {
@@ -359,9 +349,6 @@ int my_pthread_yield() {
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
         SCHEDULER->current_tcb->recent_start_time = current_time();
-        HAS_RUN++;
-        signal(SIGALRM, my_pthread_yield);
-        signal(SIGVTALRM,scheduler_maintenance);
         HAS_RUN++;
 	setcontext(&(SCHEDULER->current_tcb->context));
 	return 0;
