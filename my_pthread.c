@@ -120,6 +120,10 @@ void init_scheduler() {
 	}
         execute();
 }
+
+/*a function that do nothing but blocks signals */
+void block(){}
+
 /*Wait until there is some thread can be scheduled*/
 void execute(){
         if(SCHEDULER->current_tcb==NULL){
@@ -236,6 +240,9 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
+        //block signal
+        signal(SIGALRM, block);
+        signal(SIGVTALRM, block);
     //first check if the thread used up its time slice
 	int p =  SCHEDULER->current_tcb->priority;
      int time_slice = SCHEDULER->priority_time_slices[p];
@@ -281,6 +288,7 @@ void scheduler_maintenance() {
         }
 
     }
+        signal(SIGALRM, my_pthread_yield);
         signal(SIGVTALRM,scheduler_maintenance);
         return;
 }
@@ -305,6 +313,9 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
+        //block signal
+        signal(SIGALRM, block);
+        signal(SIGVTALRM, block);
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	if (tcb_node->state != TERMINATED) {
@@ -333,6 +344,7 @@ int my_pthread_yield() {
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
     	HAS_RUN++;
         signal(SIGALRM, my_pthread_yield);
+        signal(SIGVTALRM,scheduler_maintenance);
 	return 0;
 };
 
