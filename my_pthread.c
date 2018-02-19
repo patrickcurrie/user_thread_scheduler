@@ -135,16 +135,20 @@ void execute(){
                         execute();
                 }
         }
+        struct itimerval value_yield, value_maintain, ovalue; //(1)
         signal(SIGALRM, my_pthread_yield);
-        signal(SIGVTALRM, scheduler_maintenance);
-        struct itimerval value_yield;
+        signal(SIGVTALRM,scheduler_maintenance);
         value_yield.it_value.tv_sec = 0;
         value_yield.it_value.tv_usec = SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority];
-        struct itimerval value_maintain;
+        value_yield.it_interval.tv_sec = 0;
+        value_yield.it_interval.tv_usec = SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority];
+        setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
         value_maintain.it_value.tv_sec = 0;
         value_maintain.it_value.tv_usec = MAINTAIN;
-        setitimer(ITIMER_REAL, &value_yield, NULL);
-        setitimer(ITIMER_VIRTUAL, &value_maintain, NULL);
+        value_maintain.it_interval.tv_sec = 0;
+        value_maintain.it_interval.tv_usec = MAINTAIN;
+        setitimer(ITIMER_VIRTUAL, &value_maintain, &ovalue);
+        for(;;);
 
 }
 
@@ -277,7 +281,8 @@ void scheduler_maintenance() {
         }
 
     }
-        execute();
+        signal(SIGVTALRM,scheduler_maintenance);
+        return;
 }
 
 /* create a new thread */
@@ -327,7 +332,7 @@ int my_pthread_yield() {
         SCHEDULER->current_tcb->recent_start_time = current_time();
 	swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
     	HAS_RUN++;
-        execute();
+        signal(SIGALRM, my_pthread_yield);
 	return 0;
 };
 
