@@ -121,9 +121,10 @@ void init_scheduler() {
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
 	for (i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
-	}
-        //first to run the first thread
-        START  = 0;
+	}  
+}
+
+void execute(){
         //setup signal
         struct itimerval value_yield,ovalue; //(1)
         signal(SIGALRM, signal_handler); 
@@ -136,6 +137,7 @@ void init_scheduler() {
         for(;;);
         printf("after loop\n");
 }
+
 
 void signal_handler(){
    
