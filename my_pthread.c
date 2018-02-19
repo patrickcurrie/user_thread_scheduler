@@ -366,10 +366,52 @@ int my_pthread_yield() {
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {
+    int current_priority = SCHEDULER->current_tcb->priority;
+	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+	if (tcb_node->state != TERMINATED) {
+        if(value_ptr != NULL)
+            value_ptr = current_tcb -> return_value;
+		tcb_node->state = TERMINATED;
+	}
+    else return;
+    
 };
 
 /* wait for thread termination */
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
+    int i;
+    int flag =0;
+    for(i=0; i<NUMBER_LEVELS;i++)
+    {
+        tcb* node = SCHEDULER->multi_level_priority_queue[i]->head;
+        if(node != NULL)
+        {
+            if(node -> tid == thread)
+            {
+                while(node -> state != TERMINATED)
+                {
+                        
+                }
+                flag = 1;
+            }
+            else node = SCHEDULER->multi_level_priority_queue[i]->head->next;
+            while(node != SCHEDULER->multi_level_priority_queue[i]->head)
+            {
+                if(node -> tid == thread)
+                {
+                    while(node -> state != TERMINATED)
+                    {
+                        
+                    }
+                    flag = 1;
+                    break;
+                }
+                else node = SCHEDULER->multi_level_priority_queue[i]->head->next;
+            }
+            if(flag) break;
+        }
+        else continue;
+    }
 	return 0;
 };
 
@@ -381,8 +423,9 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 	} else {
 		SCHEDULER->wait_queues = realloc(SCHEDULER->wait_queues, sizeof(queue) * ++NUMBER_LOCKS);
 	}
-	my_pthread_mutex_t *mutex = malloc(sizeof(my_pthread_mutex_t));
-	mutex->lock_owner = NULL;
+	mutex = malloc(sizeof(my_pthread_mutex_t));
+    mutex -> val = UNLOCKED;
+	mutex->lock_owner = 0;
 	mutex->lock_wait_queue = &(SCHEDULER->wait_queues[NUMBER_LOCKS - 1]); // This is this locks wait queue.
 
 	return 0;
@@ -390,16 +433,60 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
+    
+    if(SCHEDULER->current_tcb == NULL)
+    {
+        return -1;
+    }
+    int current_priority = SCHEDULER->current_tcb ->priority;
+    printf("got here\n");
+	tcb *tcb_node = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+    while (__sync_lock_test_and_set(&(mutex -> val), 1))
+    {
+        
+        my_pthread_mutex_t *another_lock;
+        my_pthread_mutex_init(another_lock, NULL);
+        my_pthread_mutex_lock(another_lock);
+        //spin_lock(another_lock);
+        if (mutex -> lock_owner == tcb_node->tid)
+        {
+            enqueue(mutex -> lock_wait_queue, tcb_node); // Put self in queue
+            my_pthread_mutex_unlock(another_lock);
+            while(mutex -> lock_owner != tcb_node->tid){continue;}
+            //spin_unlock(another_lock);
+            //Thread.sleep(); // Put self to sleep
+        }
+        else
+        {
+            my_pthread_mutex_unlock(another_lock);
+        }
+    }
+    mutex->lock_owner = tcb_node->tid;
+    // Got the lock
 	return 0;
 };
 
 /* release the mutex lock */
 int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
+    my_pthread_mutex_t *another_lock;
+    my_pthread_mutex_init(another_lock, NULL);
+    my_pthread_mutex_lock(another_lock);
+    tcb *next_node =dequeue(mutex -> lock_wait_queue);
+    mutex -> val = UNLOCKED;
+    my_pthread_mutex_unlock(another_lock);
+    if (next_node != NULL)
+        mutex->lock_owner = next_node->tid;
 	return 0;
 };
 
 /* destroy the mutex */
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
+    tcb* node;
+    while((node = dequeue (mutex -> lock_wait_queue))!= NULL){
+        continue;
+    }
+    free(mutex -> lock_wait_queue);
+    free(mutex);
 	return 0;
 };
 

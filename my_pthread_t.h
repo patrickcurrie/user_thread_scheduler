@@ -16,6 +16,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+#define LOCKED 1
+#define UNLOCKED 0
+
 typedef uint my_pthread_t;
 
 typedef enum thread_state {
@@ -42,6 +45,7 @@ typedef struct threadControlBlock {
 typedef struct my_pthread_mutex_t {
 	/* add something here */
         mypthread_t lock_owner;          // Thread owning the mutex
+        int val;
         queue *lock_wait_queue;
 } my_pthread_mutex_t;
 
@@ -105,5 +109,6 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex);
 
 /* destroy the mutex */
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
+
 
 #endif
