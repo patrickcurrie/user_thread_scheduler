@@ -3,7 +3,7 @@
 // iLab Server:
 
 #include "my_pthread_t.h"
-
+void print_queue();
 /* Globals */
 scheduler * SCHEDULER;
 int SCHEDULER_INIT = 0;
@@ -14,7 +14,7 @@ int HAS_RUN=0;
 int START = 0;
 int CYCLE = 0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
-
+int t_id = 0;
 int first_thread = 0;
 
 /* Static internal functions */
@@ -64,10 +64,12 @@ void enqueue(queue * q, tcb * tcb_node) {
 	if (q->size == 0) {
 		q->head = tcb_node;
 		q->tail = tcb_node;
+        tcb_node->next_tcb = NULL;
 		q->size++;
 	} else {
 		q->tail->next_tcb = tcb_node;
 		q->tail = tcb_node;
+        q->tail->next_tcb=NULL;
 		q->size++;
 	}
 }
@@ -158,12 +160,12 @@ void signal_handler(){
                 setcontext(&SCHEDULER->current_tcb->context);
                 HAS_RUN++;
         }
+        
         if(CYCLE == 5){
                 CYCLE=0;
                 scheduler_maintenance();
-        }
-        //check if it need to yield
-        if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){
+        } 
+        if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){ //check if it need to yield
                 my_pthread_yield();
         }
         sigprocmask(SIG_UNBLOCK, &block, NULL);
@@ -227,11 +229,12 @@ int promotion(tcb* tcb_node){
 void remove_tcb(queue* current_queue, tcb* prev, tcb* current){
     if(current_queue->size==1){
         current_queue->tail=NULL;
-        current_queue->tail=NULL;
+        current_queue->head=NULL;
         current=NULL;
         prev = current;
+        return;
     }
-    if (current!=prev) { //check if this is the head of the queue
+    if (current==prev) { //check if this is the head of the queue
         current = current->next_tcb;
         prev = current;
         current_queue->head = current;
@@ -253,8 +256,8 @@ Responsible for:
 - Check if current running tcb (SCHEDULER->current_tcb) has used up its time slice, swap context and adjust accordingly if so.
 */
 void scheduler_maintenance() {
-    printf("Entered a maintenance cycle\n");
-    int p =  SCHEDULER->current_tcb->priority;
+        printf("Entered a maintenance cycle\n");
+        int p =  0;
         //create an array to store 3 oldest thread
         tcb* oldest[6];
         //set all the 6 slot to 0
@@ -264,9 +267,12 @@ void scheduler_maintenance() {
         }
         //loop through all the queue and check for deletion and promotion
         int i=0;
+        int x = 0;
         printf("Before first for loop\n");
         for(i=0; i<NUMBER_LEVELS;i++){
             printf("In the first for loop\n");
+            print_queue();
+                p=i;
                 int size = SCHEDULER->multi_level_priority_queue[i].size;
                 queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
                 printf("size of the queue is:%d\n", current_queue->size);
@@ -274,9 +280,8 @@ void scheduler_maintenance() {
                 tcb* prev = current_queue->head;
                 while(current!=NULL){
                         printf("In the first while loop\n");
-                        printf("pid:%u\n", current->tid);
                         //first check if the state of any tcb is terminated, if yes release the recourse
-                        if(current->state==TERMINATED){
+                        if(current->state==TERMINATED&&SCHEDULER->current_tcb!=current){
                                 printf("In Terminated\n");
                                 tcb* tmp = current;
                                 remove_tcb(current_queue,prev,current);
@@ -284,12 +289,13 @@ void scheduler_maintenance() {
                                 free(tmp);
                         }else if(promotion(current)==-1){
                                 printf("In Promotion\n");
-                                if(p!=NUMBER_LEVELS-1){
+                                if(p!=NUMBER_LEVELS){
                                         tcb* tmp = current;
                                         remove_tcb(current_queue,prev,current);
+                                        tmp->next_tcb=NULL;
                                         current_queue->size--;
-                                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1],tmp);
-                                        SCHEDULER->multi_level_priority_queue[p-1].size++;
+                                        enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
+                                        SCHEDULER->multi_level_priority_queue[p+1].size++;
                                         tmp->priority--;
                                 }
                         }else{
@@ -302,6 +308,7 @@ void scheduler_maintenance() {
         }
         printf("Before second for loop\n");
         for(i=0; i<NUMBER_LEVELS;i++){
+                p=i;
                 int size = SCHEDULER->multi_level_priority_queue[i].size;
                 queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
                 tcb* current = current_queue->head;
@@ -321,15 +328,6 @@ void scheduler_maintenance() {
                                 }
                                 prev = current;
                                 current = current->next_tcb;
-
-                                /*if(p!=0){
-                                    tcb* tmp = current;
-                                    remove_tcb(current_queue,prev,current);
-                                    current_queue->size--;
-                                    enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
-                                    SCHEDULER->multi_level_priority_queue[p+1].size++;
-                                    tmp->priority++;
-                                }*/
                         }else if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[5]->initial_start_time,<)>0){
                                 if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[3]->initial_start_time,<)>0){
                                         if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0) {
@@ -359,8 +357,8 @@ void scheduler_maintenance() {
                         p = tmp->priority;
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[4], oldest[5]);
                         SCHEDULER->multi_level_priority_queue[p].size--;
-                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p-1].size++;
                         tmp->priority++;
                 }
         }
@@ -370,8 +368,8 @@ void scheduler_maintenance() {
                         p = tmp->priority;
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[2], oldest[3]);
                         SCHEDULER->multi_level_priority_queue[p].size--;
-                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p-1].size++;
                         tmp->priority++;
                 }
         }
@@ -381,8 +379,8 @@ void scheduler_maintenance() {
                         p = tmp->priority;
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[0], oldest[1]);
                         SCHEDULER->multi_level_priority_queue[p].size--;
-                        enqueue(&SCHEDULER->multi_level_priority_queue[p+ 1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p + 1].size++;
+                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
+                        SCHEDULER->multi_level_priority_queue[p-1].size++;
                         tmp->priority++;
                 }
         }
@@ -400,8 +398,8 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
-	tcb_node->tid = *thread;
-    printf("The created pid is: %x", tcb_node->tid);
+    t_id++;
+	tcb_node->tid = t_id;//*thread;
 	if (getcontext(&(tcb_node->context)) != 0) {
 		return -1; // Error getthing context
 	}
@@ -434,7 +432,6 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
     printf("yield\n");
-        //block signal
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	if (tcb_node->state != TERMINATED) {
@@ -459,8 +456,8 @@ int my_pthread_yield() {
 	}
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
-        SCHEDULER->current_tcb->recent_start_time = current_time();
-        HAS_RUN++;
+    SCHEDULER->current_tcb->recent_start_time = current_time();
+    HAS_RUN++;
 	setcontext(&(SCHEDULER->current_tcb->context));
 	return 0;
 };
@@ -596,3 +593,16 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
+void print_queue(){
+    int i=0;
+    int x=0;
+    for(i=0;i<NUMBER_LEVELS;i++){
+        int size = SCHEDULER->multi_level_priority_queue[i].size;
+        tcb* p = SCHEDULER->multi_level_priority_queue[i].head;
+        while(p!=NULL){
+            printf("%d ",p->tid);
+            p = p->next_tcb;
+        }
+        printf("\n");
+    }
+}
