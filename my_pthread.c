@@ -61,7 +61,6 @@ enqueue. If it is not empty, then node will be inserted before the tail of the
 queue, and become the new tail.
 */
 void enqueue(queue * q, tcb * tcb_node) {
-    printf("size of the queue: %d", q->size);
 	if (q->size == 0) {
 		q->head = tcb_node;
 		q->tail = tcb_node;
@@ -454,7 +453,10 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
     printf("yield\n");
+    printf("The tid of thread: %d\n", SCHEDULER->current_tcb->tid);
+    //printf("The tid of next thread: %d\n", SCHEDULER->current_tcb->next_tcb->tid);
 	int current_priority = SCHEDULER->current_tcb->priority;
+    print_queue();
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
     printf("reach 1\n");
 	if (tcb_node->state != TERMINATED) {
@@ -463,20 +465,27 @@ int my_pthread_yield() {
     printf("reach 2\n");
 	schedule_thread(tcb_node, tcb_node->priority);
     	//check to see if we need to move on to the next queue
-    	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size) {
+    	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
         	HAS_RUN=0; //running a new queue set the counter to 0
-                if (current_priority==NUMBER_LEVELS-1) {// this is the lowest priority
-        		SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[0])); //run the highest priority queue
-                } else {
-            		SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority+1])); //run the next priority queue
+            int i = 0;
+            int stop = current_priority;
+            for(i=current_priority; i!=stop;){
+                if(current_priority==NUMBER_LEVELS-1){
+                    current_priority = 0;
+                    SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+                }else{
+                    SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[++current_priority]));
                 }
-        } else {
-                SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
+            }
+        }else{
+            SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
         }
     printf("reach 3\n");
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
-	while(SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
-		
+    printf("The tid of thread: %d\n", SCHEDULER->current_tcb->tid);
+	if(SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
+        my_pthread_yield();
+        return 0;
 	}
     printf("reach 4\n");
 	SCHEDULER->current_tcb->state = RUNNING;
