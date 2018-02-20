@@ -465,7 +465,7 @@ int my_pthread_yield() {
         }
     printf("reach 3\n");
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
-	if(SCHEDULER->./->state == TERMINATED) { // Don't run context if TERMINATED
+	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
 		my_pthread_yield();
 		return 0;
 	}
