@@ -286,7 +286,7 @@ void scheduler_maintenance() {
                 while(current!=NULL){
                         printf("In the first while loop\n");
                         //first check if the state of any tcb is terminated, if yes release the recourse
-                        if(current->state==TERMINATED/*&&SCHEDULER->current_tcb!=current*/){
+                        if(current->state==TERMINATED){
                                 printf("In Terminated, the tid is: %d\n", current->tid);
                                 tcb* tmp = current;
                                 current = remove_tcb(current_queue,prev,current);
