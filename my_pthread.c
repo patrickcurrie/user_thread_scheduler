@@ -226,26 +226,31 @@ int promotion(tcb* tcb_node){
 }
 
 /* a helper function for maintenance*/
-void remove_tcb(queue* current_queue, tcb* prev, tcb* current){
+tcb* remove_tcb(queue* current_queue, tcb* prev, tcb* current){
     if(current_queue->size==1){
+        printf("The only one\n");
         current_queue->tail=NULL;
         current_queue->head=NULL;
         current=NULL;
         prev = current;
-        return;
+        return current;
     }
-    if (current==prev) { //check if this is the head of the queue
+    if (current==current_queue->head) { //check if this is the head of the queue
+        printf("head\n");
         current = current->next_tcb;
         prev = current;
         current_queue->head = current;
     }else if(current==current_queue->tail){//check if this is the tail of the queue
+        printf("tail\n");
         current=NULL;
         prev->next_tcb=NULL;
         current_queue->tail = prev;
     }else{
+        printf("middle\n");
         current = current->next_tcb;
         prev->next_tcb = current;
     }
+    return current;
 }
 /*
 Maintenance done on the multi-level priority queue to handle the SIGALRM signal.
@@ -281,25 +286,28 @@ void scheduler_maintenance() {
                 while(current!=NULL){
                         printf("In the first while loop\n");
                         //first check if the state of any tcb is terminated, if yes release the recourse
-                        if(current->state==TERMINATED&&SCHEDULER->current_tcb!=current){
-                                printf("In Terminated\n");
+                        if(current->state==TERMINATED/*&&SCHEDULER->current_tcb!=current*/){
+                                printf("In Terminated, the tid is: %d\n", current->tid);
                                 tcb* tmp = current;
-                                remove_tcb(current_queue,prev,current);
+                                current = remove_tcb(current_queue,prev,current);
                                 current_queue->size--;
                                 free(tmp);
                         }else if(promotion(current)==-1){
-                                printf("In Promotion\n");
-                                if(p!=NUMBER_LEVELS){
+                                printf("In Promotion, the tid is: %d\n", current->tid);
+                                if(p!=NUMBER_LEVELS-1){
                                         tcb* tmp = current;
-                                        remove_tcb(current_queue,prev,current);
+                                        current = remove_tcb(current_queue,prev,current);
                                         tmp->next_tcb=NULL;
                                         current_queue->size--;
                                         enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
                                         SCHEDULER->multi_level_priority_queue[p+1].size++;
                                         tmp->priority--;
+                                }else{
+                                    prev = current;
+                                    current = current->next_tcb;
                                 }
                         }else{
-                                printf("In Else\n");
+                                printf("In Else, the tid is: %d\n", current->tid);
                                 prev = current;
                                 current = current->next_tcb;
                         }
@@ -384,7 +392,7 @@ void scheduler_maintenance() {
                         tmp->priority++;
                 }
         }
-
+        printf("Before return\n");
         return;
 }
 
