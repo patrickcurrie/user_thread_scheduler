@@ -146,7 +146,6 @@ void signal_handler(){
         sigaddset(&block, SIGALRM);
         sigprocmask(SIG_BLOCK, &block, NULL);
         CYCLE++;
-        printf("In sig handler\n");
         printf("the cycle number is: %d\n", CYCLE);
         if(first_thread == 0){
             return;
@@ -163,10 +162,14 @@ void signal_handler(){
 
         if(CYCLE == 5){
                 CYCLE=0;
+                printf("Before maintain: %d\n", SCHEDULER->current_tcb->tid);
                 scheduler_maintenance();
+                print_queue();
         }
         if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){ //check if it need to yield
+                printf("Before yield: %d\n", SCHEDULER->current_tcb->tid);
                 my_pthread_yield();
+                printf("After yield: %d\n", SCHEDULER->current_tcb->tid);
         }
         sigprocmask(SIG_UNBLOCK, &block, NULL);
 }
@@ -443,9 +446,11 @@ int my_pthread_yield() {
     printf("yield\n");
 	int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+    printf("reach 1\n");
 	if (tcb_node->state != TERMINATED) {
 		tcb_node->state = READY;
 	}
+    printf("reach 2\n");
 	schedule_thread(tcb_node, tcb_node->priority);
     	//check to see if we need to move on to the next queue
     	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size) {
@@ -458,16 +463,19 @@ int my_pthread_yield() {
         } else {
                 SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority])); //stay in the same queue
         }
+    printf("reach 3\n");
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
-	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
+	if(SCHEDULER->./->state == TERMINATED) { // Don't run context if TERMINATED
 		my_pthread_yield();
 		return 0;
 	}
+    printf("reach 4\n");
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
     SCHEDULER->current_tcb->recent_start_time = current_time();
     HAS_RUN++;
 	setcontext(&(SCHEDULER->current_tcb->context));
+    
 	return 0;
 };
 
