@@ -14,7 +14,7 @@ int HAS_RUN=0;
 int START = 0;
 int CYCLE = 0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
-int t_id = 0;
+int T_ID = 0;
 int first_thread = 0;
 
 /* Static internal functions */
@@ -124,19 +124,19 @@ void init_scheduler() {
 	SCHEDULER->priority_time_slices = malloc(sizeof(int) * NUMBER_LEVELS);
 	for (i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
-	}  
+	}
 }
 
 void execute(){
         //setup signal
         struct itimerval value_yield,ovalue; //(1)
-        signal(SIGALRM, signal_handler); 
+        signal(SIGALRM, signal_handler);
         value_yield.it_value.tv_sec = 0;
         value_yield.it_value.tv_usec = 25000;
         value_yield.it_interval.tv_sec = 0;
         value_yield.it_interval.tv_usec = 25000;
         setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
-        
+
 }
 
 
@@ -150,21 +150,21 @@ void signal_handler(){
         printf("the cycle number is: %d\n", CYCLE);
         if(first_thread == 0){
             return;
-        } 
+        }
         if(START==0){
                 START=1;
-                
+
                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
                 SCHEDULER->current_tcb->state = RUNNING;
                 SCHEDULER->current_tcb->recent_start_time = current_time();
                 setcontext(&SCHEDULER->current_tcb->context);
                 HAS_RUN++;
         }
-        
+
         if(CYCLE == 5){
                 CYCLE=0;
                 scheduler_maintenance();
-        } 
+        }
         if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){ //check if it need to yield
                 my_pthread_yield();
         }
@@ -398,8 +398,9 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
-    t_id++;
-	tcb_node->tid = t_id;//*thread;
+        T_ID++;
+	tcb_node->tid = T_ID;//*thread;
+        *thread = T_ID;
 	if (getcontext(&(tcb_node->context)) != 0) {
 		return -1; // Error getthing context
 	}
@@ -408,7 +409,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	tcb_node->context.uc_stack.ss_flags = 0;
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
-    
+
         schedule_thread(tcb_node, 0);
     if(first_thread == 0) {
         first_thread = 1;
@@ -472,7 +473,7 @@ void my_pthread_exit(void *value_ptr) {
 		tcb_node->state = TERMINATED;
 	}
     else return;
-    
+
 };
 
 /* wait for thread termination */
@@ -488,7 +489,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
             {
                 while(node -> state != TERMINATED)
                 {
-                        
+
                 }
                 flag = 1;
             }
@@ -499,7 +500,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
                 {
                     while(node -> state != TERMINATED)
                     {
-                        
+
                     }
                     flag = 1;
                     break;
@@ -515,7 +516,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 
 /* initial the mutex lock */
 int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
-    
+
     if (SCHEDULER_INIT == 0) {
         init_scheduler();
         SCHEDULER_INIT =1;
@@ -530,13 +531,13 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
     mutex -> val = UNLOCKED;
 	mutex->lock_owner = 0;
 	mutex->lock_wait_queue = &(SCHEDULER->wait_queues[NUMBER_LOCKS - 1]); // This is this locks wait queue.
-    
+
 	return 0;
 };
 
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
-    
+
     if(SCHEDULER->current_tcb == NULL)
     {
         return -1;
@@ -546,7 +547,7 @@ int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
 	tcb *tcb_node = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
     while (__sync_lock_test_and_set(&(mutex -> val), 1))
     {
-        
+
         my_pthread_mutex_t *another_lock;
         my_pthread_mutex_init(another_lock, NULL);
         my_pthread_mutex_lock(another_lock);
