@@ -27,6 +27,7 @@ static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), v
 	SCHEDULER->current_tcb = tcb_node;
 	tcb_node->state = RUNNING;
 	tcb_node->initial_start_time = current_time();
+    printf("The id of this thread is: %d. The start time is:%d, %d\n", tcb_node->tid, tcb_node->initial_start_time.tv_sec, tcb_node->initial_start_time.tv_usec);
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
 	SCHEDULER->current_tcb = NULL;
@@ -156,8 +157,8 @@ void signal_handler(){
                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
                 SCHEDULER->current_tcb->state = RUNNING;
                 SCHEDULER->current_tcb->recent_start_time = current_time();
-                setcontext(&SCHEDULER->current_tcb->context);
                 HAS_RUN++;
+                setcontext(&SCHEDULER->current_tcb->context);
         }
 
         if(CYCLE == 5){
@@ -218,7 +219,7 @@ int time_compare(struct timeval start, struct timeval end, int gap){
  * */
 int promotion(tcb* tcb_node){
         int priority  = tcb_node->priority;
-        struct timeval start_time = tcb_node->initial_start_time;
+        struct timeval start_time = tcb_node->recent_start_time;
         struct timeval end_time = tcb_node->last_yield_time;
         int time = SCHEDULER->priority_time_slices[priority];
         if(time_compare(start_time,end_time,time)!=-1){
@@ -230,6 +231,8 @@ int promotion(tcb* tcb_node){
 
 /* a helper function for maintenance*/
 tcb* remove_tcb(queue* current_queue, tcb* prev, tcb* current){
+    printf("The id of the current thread is: %d\n", current->tid);
+    printf("The size of the queue is:%d\n", current_queue->size);
     if(current_queue->size==1){
         printf("The only one\n");
         current_queue->tail=NULL;
@@ -316,116 +319,65 @@ void scheduler_maintenance() {
                 }
 
         }
-        printf("Before second for loop\n");
-        for(i=0; i<NUMBER_LEVELS;i++){
+        int ind = 0;
+        struct timeval min;
+        struct timeval max;
+        min.tv_sec = 0;
+        min.tv_usec = 0;
+        max.tv_sec = 9999999999;
+        max.tv_usec = 999999;
+        tcb* old_tcb1 = NULL;
+        tcb* old_tcb2 = NULL;
+        for(ind=0; ind<3; ind++){
+            printf("Before second for loop\n");
+            tcb* m = NULL;
+            tcb* pm = NULL;
+            for(i=0; i<NUMBER_LEVELS;i++){
                 p=i;
                 int size = SCHEDULER->multi_level_priority_queue[i].size;
                 queue* current_queue = &SCHEDULER->multi_level_priority_queue[i];
                 tcb* current = current_queue->head;
                 tcb* prev = current_queue->head;
                 while(current!=NULL){
-                        //first check if the state of any tcb is terminated, if yes release the recourse
-                        if (oldest[1]==NULL&&oldest[3]==NULL&&oldest[5]==NULL){ //to a higher level queue
-                            oldest[0]=prev;
-                            oldest[1] = current;
-                            prev = current;
-                            current = current->next_tcb;
-                        }else if(oldest[1]!=NULL&&oldest[3]==NULL&&oldest[5]==NULL){
-                            if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0){
-                                tcb* tmp_prev = oldest[0];
-                                tcb* tmp_current = oldest[1];
-                                oldest[0]=prev;
-                                oldest[1] = current;
-                                oldest[2] = tmp_prev;
-                                oldest[3] = tmp_current;
-                            }else{
-                                oldest[2] = prev;
-                                oldest[3] = current;
-                            }
-                            prev = current;
-                            current = current->next_tcb;
-                        }else if(oldest[1]!=NULL&&oldest[3]!=NULL&&oldest[5]==NULL){
-                            if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[3]->initial_start_time,<)>0){
-                                if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0){
-                                    tcb* tmp_prev1 = oldest[0];
-                                    tcb* tmp_current1 = oldest[1];
-                                    tcb* tmp_prev2 = oldest[2];
-                                    tcb* tmp_current2 = oldest[3];
-                                    oldest[0]=prev;
-                                    oldest[1] = current;
-                                    oldest[2] = tmp_prev1;
-                                    oldest[3] = tmp_current1;
-                                    oldest[4] = tmp_prev2;
-                                    oldest[5] = tmp_current2;
-                                }else{
-                                    tcb* tmp_prev = oldest[2];
-                                    tcb* tmp_current = oldest[3];
-                                    oldest[2]=prev;
-                                    oldest[3] = current;
-                                    oldest[4] = tmp_prev;
-                                    oldest[5] = tmp_current;
-                                }
-                            }else{
-                                oldest[4] = prev;
-                                oldest[5] = current;
-                            }
-                                prev = current;
-                                current = current->next_tcb;
-                        }else if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[5]->initial_start_time,<)>0){
-                                if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[3]->initial_start_time,<)>0){
-                                        if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0) {
-                                                oldest[0] = prev;
-                                                oldest[1] = current;
-                                        }else{
-                                                oldest[2] = prev;
-                                                oldest[3] = current;
-                                        }
-                                }else{
-                                        oldest[4] = prev;
-                                        oldest[5] = current;
-                                }
-                                prev = current;
-                                current = current->next_tcb;
-                        } else{
-                                prev = current;
-                                current = current->next_tcb;
+                    if(current->initial_start_time.tv_sec!=0&&current->initial_start_time.tv_usec!=0&&current!=old_tcb1&&current!=old_tcb2){
+                        if(timercmp(&current->initial_start_time,&min,>=)>0&&timercmp(&current->initial_start_time,&max,<)>0){
+                            max = current->initial_start_time;
+                            m = current;
+                            pm = prev;
                         }
+                        prev = current;
+                        current = current->next_tcb;
+                    }else{
+                        prev = current;
+                        current = current->next_tcb;
+                    }
                 }
-
-        }
-        print_queue();
-        printf("The three oldest thread is: %d, %d, %d\n", oldest[1]->tid,oldest[3]->tid,oldest[5]->tid);
-        printf("After for loop\n");
-        if(oldest[5]!=NULL){
-                if(oldest[5]->priority!=0) {
-                        tcb *tmp = oldest[5];
-                        int pp = oldest[5]->priority;
-                        remove_tcb(&SCHEDULER->multi_level_priority_queue[pp], oldest[4], oldest[5]);
+            }
+            if(old_tcb1==NULL){
+                old_tcb1 = m;
+            }else{
+                old_tcb2 = m;
+            }
+            print_queue();
+            printf("The oldest thread is:                                  %d\n", m->tid);
+            printf("After for loop\n");
+            if(m!=NULL){
+                if(m->priority!=0) {
+                        tcb *tmp = m;
+                        int pp = m->priority;
+                        remove_tcb(&SCHEDULER->multi_level_priority_queue[pp], pm, m);
+                        tmp->next_tcb = NULL;
                         SCHEDULER->multi_level_priority_queue[pp].size--;
                         enqueue(&SCHEDULER->multi_level_priority_queue[pp-1], tmp);
+                        print_queue();
                         tmp->priority--;
                 }
+            }
+            min = max;
+            max.tv_sec = 9999999999;
+            max.tv_usec = 999999;
         }
-        if(oldest[3]!=NULL){
-                if(oldest[3]->priority!=0) {
-                        tcb *tmp = oldest[3];
-                        p = tmp->priority;
-                        remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[2], oldest[3]);
-                        SCHEDULER->multi_level_priority_queue[p].size--;
-                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        tmp->priority--;
-                }
-        }
-        if(oldest[1]!=NULL){
-                if(oldest[1]->priority!=0) {
-                        tcb *tmp = oldest[1];
-                        p = tmp->priority;
-                        remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[0], oldest[1]);
-                        SCHEDULER->multi_level_priority_queue[p].size--;
-                        enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        tmp->priority--;
-                }
-        }
+        
         printf("Before return\n");
         return;
 }
@@ -502,7 +454,7 @@ int my_pthread_yield() {
                 if(SCHEDULER->current_tcb!=NULL){
                     break;
                 }else{
-                    if(current_priority==NUMBER_LEVELS-1){
+                    if(c==NUMBER_LEVELS-1){
                         c = 0;
                     }else{
                         c++;
