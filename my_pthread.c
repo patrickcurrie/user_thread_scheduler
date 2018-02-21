@@ -170,7 +170,7 @@ void signal_handler(){
         }
         if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){ //check if it need to yield
                 printf("Before yield: %d\n", SCHEDULER->current_tcb->tid);
-                my_pthread_yield();
+                my_pthread_yield_helper();
                 printf("After yield: %d\n", SCHEDULER->current_tcb->tid);
         }
         sigprocmask(SIG_UNBLOCK, &block, NULL);
@@ -428,7 +428,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 }
 
 /* give CPU pocession to other user level threads voluntarily */
-int my_pthread_yield() {
+void my_pthread_yield_helper() {
         printf("yield\n");
         printf("The tid of thread: %d\n", SCHEDULER->current_tcb->tid);
         //printf("The tid of next thread: %d\n", SCHEDULER->current_tcb->next_tcb->tid);
@@ -437,13 +437,9 @@ int my_pthread_yield() {
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
         printf("reach 1\n");
 	if (tcb_node->state != TERMINATED) {
-                printf("In yield, tcb_node->state == TERMINATED.\n");
+                printf("In yield, tcb_node->state != TERMINATED.\n");
 		tcb_node->state = READY;
-	} else {
-                printf("Return context saved in yield\n");
-                getcontext(&(tcb_node->context));
-                tcb_node->context = *(tcb_node->context.uc_link);
-        }
+	}
         printf("reach 2\n");
 	schedule_thread(tcb_node, tcb_node->priority);
     	//check to see if we need to move on to the next queue
@@ -482,7 +478,7 @@ int my_pthread_yield() {
                         }
 
                         if (SCHEDULER->current_tcb == NULL) {
-                                return 0;
+                                return;
                         }
                 }
 
@@ -496,18 +492,24 @@ int my_pthread_yield() {
                 printf("The state of the current thread: TERMINATED\n" );
         }
 	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
-                my_pthread_yield();
-                return 0;
+                my_pthread_yield_helper();
+                return;
 	}
         printf("reach 4\n");
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
         SCHEDULER->current_tcb->recent_start_time = current_time();
         HAS_RUN++;
-	setcontext(&(SCHEDULER->current_tcb->context));
+        swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
+	//setcontext(&(SCHEDULER->current_tcb->context));
 
-	return 0;
-};
+	return;
+}
+
+/* give CPU pocession to other user level threads voluntarily */
+int my_pthread_yield() {
+        return 0;
+}
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {

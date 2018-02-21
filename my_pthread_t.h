@@ -87,6 +87,9 @@ void init_scheduler();
 
 void scheduler_maintenance();
 
+/* Helper for yield */
+void my_pthread_yield_helper();
+
 /* create a new thread */
 int my_pthread_create(my_pthread_t *thread, pthread_attr_t *attr, void *(*function)(void*), void *arg);
 
