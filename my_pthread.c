@@ -316,7 +316,7 @@ void scheduler_maintenance() {
                 }
 
         }
-        /*printf("Before second for loop\n");
+        printf("Before second for loop\n");
         for(i=0; i<NUMBER_LEVELS;i++){
                 p=i;
                 int size = SCHEDULER->multi_level_priority_queue[i].size;
@@ -367,28 +367,20 @@ void scheduler_maintenance() {
                 if(oldest[5]->priority!=0) {
                         tcb *tmp = oldest[5];
                         int pp = oldest[5]->priority;
-                        printf("middle print: %d, %d\n", oldest[4]->tid, oldest[5]->tid);
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[pp], oldest[4], oldest[5]);
-                        printf("middle print: %d, %d\n", tmp->tid, oldest[5]->tid);
                         SCHEDULER->multi_level_priority_queue[pp].size--;
-                        printf("aaaaa\n");
-                        printf("bbbb\n");
                         enqueue(&SCHEDULER->multi_level_priority_queue[pp-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[pp-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
         if(oldest[3]!=NULL){
                 if(oldest[3]->priority!=0) {
                         tcb *tmp = oldest[3];
                         p = tmp->priority;
-                        
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[2], oldest[3]);
- 
                         SCHEDULER->multi_level_priority_queue[p].size--;
                         enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
         if(oldest[1]!=NULL){
@@ -398,11 +390,10 @@ void scheduler_maintenance() {
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[0], oldest[1]);
                         SCHEDULER->multi_level_priority_queue[p].size--;
                         enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
-        printf("Before return\n");*/
+        printf("Before return\n");
         return;
 }
 
