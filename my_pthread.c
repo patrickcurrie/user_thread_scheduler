@@ -325,17 +325,50 @@ void scheduler_maintenance() {
                 tcb* prev = current_queue->head;
                 while(current!=NULL){
                         //first check if the state of any tcb is terminated, if yes release the recourse
-                        if (oldest[1]==NULL||oldest[3]==NULL||oldest[5]==NULL){ //to a higher level queue
-                                if(oldest[1]==NULL){
-                                        oldest[0]=prev;
-                                        oldest[1] = current;
-                                }else if(oldest[3]==NULL){
-                                        oldest[2] = prev;
-                                        oldest[3] = current;
+                        if (oldest[1]==NULL&&oldest[3]==NULL&&oldest[5]==NULL){ //to a higher level queue
+                            oldest[0]=prev;
+                            oldest[1] = current;
+                            prev = current;
+                            current = current->next_tcb;
+                        }else if(oldest[1]!=NULL&&oldest[3]==NULL&&oldest[5]==NULL){
+                            if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0){
+                                tcb* tmp_prev = oldest[0];
+                                tcb* tmp_current = oldest[1];
+                                oldest[0]=prev;
+                                oldest[1] = current;
+                                oldest[2] = tmp_prev;
+                                oldest[3] = tmp_current;
+                            }else{
+                                oldest[2] = prev;
+                                oldest[3] = current;
+                            }
+                            prev = current;
+                            current = current->next_tcb;
+                        }else if(oldest[1]!=NULL&&oldest[3]!=NULL&&oldest[5]==NULL){
+                            if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[3]->initial_start_time,<)>0){
+                                if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[1]->initial_start_time,<)>0){
+                                    tcb* tmp_prev1 = oldest[0];
+                                    tcb* tmp_current1 = oldest[1];
+                                    tcb* tmp_prev2 = oldest[2];
+                                    tcb* tmp_current2 = oldest[3];
+                                    oldest[0]=prev;
+                                    oldest[1] = current;
+                                    oldest[2] = tmp_prev1;
+                                    oldest[3] = tmp_current1;
+                                    oldest[4] = tmp_prev2;
+                                    oldest[5] = tmp_current2;
                                 }else{
-                                        oldest[4] = prev;
-                                        oldest[5] = current;
+                                    tcb* tmp_prev = oldest[2];
+                                    tcb* tmp_current = oldest[3];
+                                    oldest[2]=prev;
+                                    oldest[3] = current;
+                                    oldest[4] = tmp_prev;
+                                    oldest[5] = tmp_current;
                                 }
+                            }else{
+                                oldest[4] = prev;
+                                oldest[5] = current;
+                            }
                                 prev = current;
                                 current = current->next_tcb;
                         }else if(timercmp(&SCHEDULER->current_tcb->initial_start_time,&oldest[5]->initial_start_time,<)>0){
