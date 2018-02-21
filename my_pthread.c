@@ -303,7 +303,6 @@ void scheduler_maintenance() {
                                         tmp->next_tcb=NULL;
                                         current_queue->size--;
                                         enqueue(&SCHEDULER->multi_level_priority_queue[p+1],tmp);
-                                        SCHEDULER->multi_level_priority_queue[p+1].size++;
                                         tmp->priority++;
                                 }else{
                                     prev = current;
@@ -368,29 +367,20 @@ void scheduler_maintenance() {
                 if(oldest[5]->priority!=0) {
                         tcb *tmp = oldest[5];
                         int pp = oldest[5]->priority;
-                        printf("middle print: %d, %d\n", oldest[4]->tid, oldest[5]->tid);
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[pp], oldest[4], oldest[5]);
-                        printf("middle print: %d, %d\n", tmp->tid, oldest[5]->tid);
                         SCHEDULER->multi_level_priority_queue[pp].size--;
-                        printf("aaaaa\n");
-                        printf("size:%d\n", pp/*&SCHEDULER->multi_level_priority_queue[p-1].size*/);
-                        printf("bbbb\n");
                         enqueue(&SCHEDULER->multi_level_priority_queue[pp-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[pp-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
         if(oldest[3]!=NULL){
                 if(oldest[3]->priority!=0) {
                         tcb *tmp = oldest[3];
                         p = tmp->priority;
-                        
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[2], oldest[3]);
- 
                         SCHEDULER->multi_level_priority_queue[p].size--;
                         enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
         if(oldest[1]!=NULL){
@@ -400,8 +390,7 @@ void scheduler_maintenance() {
                         remove_tcb(&SCHEDULER->multi_level_priority_queue[p], oldest[0], oldest[1]);
                         SCHEDULER->multi_level_priority_queue[p].size--;
                         enqueue(&SCHEDULER->multi_level_priority_queue[p-1], tmp);
-                        SCHEDULER->multi_level_priority_queue[p-1].size++;
-                        tmp->priority++;
+                        tmp->priority--;
                 }
         }
         printf("Before return\n");
@@ -465,24 +454,51 @@ int my_pthread_yield() {
     printf("reach 2\n");
 	schedule_thread(tcb_node, tcb_node->priority);
     	//check to see if we need to move on to the next queue
+        printf("The size of the queue is:%d\n",SCHEDULER->multi_level_priority_queue[current_priority].size );
+        printf("The size of the hasrun is:%d\n",HAS_RUN );
     	if (HAS_RUN>=SCHEDULER->multi_level_priority_queue[current_priority].size){
         	HAS_RUN=0; //running a new queue set the counter to 0
+            int c = 0;
+            if(current_priority!=NUMBER_LEVELS-1){
+                c = current_priority+1;
+            }
             int i = 0;
-            int stop = current_priority;
-            for(i=current_priority; i!=stop;){
-                if(current_priority==NUMBER_LEVELS-1){
-                    current_priority = 0;
-                    SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
+            int final = NUMBER_LEVELS-2;
+            for(i=0; i<=final;i++){
+                SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[c]));
+                if(SCHEDULER->current_tcb!=NULL){
+                    break;
                 }else{
-                    SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[++current_priority]));
+                    if(current_priority==NUMBER_LEVELS-1){
+                        c = 0;
+                    }else{
+                        c++;
+                    }
                 }
             }
+            if(SCHEDULER->current_tcb==NULL){
+                //look for the if there is still threads left
+                int i=0;
+                for(i=0; i<NUMBER_LEVELS;i++){
+                    if(SCHEDULER->multi_level_priority_queue[i].size>0){
+                        SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[i]));
+                        break;
+                    }
+                }
+                if(SCHEDULER->current_tcb==NULL){
+                    return 0;
+                }
+            }
+            
         }else{
             SCHEDULER->current_tcb = peek(&(SCHEDULER->multi_level_priority_queue[current_priority]));
         }
     printf("reach 3\n");
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
     printf("The tid of thread: %d\n", SCHEDULER->current_tcb->tid);
+    if(SCHEDULER->current_tcb->state==TERMINATED){
+        printf("The state of the current thread: TERMINATED\n" );
+    }
 	if(SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
         my_pthread_yield();
         return 0;
@@ -499,6 +515,7 @@ int my_pthread_yield() {
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {
+    printf("Exit\n");
     int current_priority = SCHEDULER->current_tcb->priority;
 	tcb *tcb_node = dequeue(&(SCHEDULER->multi_level_priority_queue[current_priority]));
 	if (tcb_node->state != TERMINATED) {
@@ -512,6 +529,7 @@ void my_pthread_exit(void *value_ptr) {
 
 /* wait for thread termination */
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
+    printf("Join\n");
     int i;
     int flag =0;
     for(i=0; i<NUMBER_LEVELS;i++)
