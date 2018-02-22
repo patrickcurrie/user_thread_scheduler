@@ -134,13 +134,17 @@ void init_scheduler() {
 void execute() {
         //setup signal
         struct itimerval value_yield, ovalue; //(1)
-        signal(SIGALRM, signal_handler);
+        struct sigaction act, oact;
+        sigemptyset(&act.sa_mask);
+        sigaddset(&act.sa_mask, SIGVTALRM);
+        act.sa_flags = 0;
+        act.sa_handler = signal_handler;
+        sigaction(SIGVTALRM,&act,&oact);
         value_yield.it_value.tv_sec = 0;
         value_yield.it_value.tv_usec = 25000;
         value_yield.it_interval.tv_sec = 0;
         value_yield.it_interval.tv_usec = 25000;
-        setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
-
+        setitimer(ITIMER_VIRTUAL, &value_yield, &ovalue); //(2)
 }
 
 void clear_timer() {
@@ -153,12 +157,17 @@ void clear_timer() {
         setitimer(ITIMER_REAL, &tick, NULL);
 }
 
+void restore_timer(){
+    struct itimerval tick;
+        //clear the timer
+        tick.it_value.tv_sec = 0;
+        tick.it_value.tv_usec = 25000;
+        tick.it_interval.tv_sec = 0;
+        tick.it_interval.tv_usec = 25000;
+        setitimer(ITIMER_REAL, &tick, NULL);
+}
 
 void signal_handler(){
-        sigset_t block;
-        sigemptyset(&block);
-        sigaddset(&block, SIGALRM);
-        sigprocmask(SIG_BLOCK, &block, NULL);
         CYCLE++;
         if(first_thread == 0){
             return;
@@ -210,7 +219,6 @@ void signal_handler(){
                 swapcontext(&(SCHEDULER->current_tcb->context), &SIGNAL_CONTEXT);
                 //my_pthread_yield_helper();
         }
-        sigprocmask(SIG_UNBLOCK, &block, NULL);
 }
 
 /*A helper function for maintain to compare time*/
