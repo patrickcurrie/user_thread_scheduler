@@ -5,7 +5,9 @@
 #include "my_pthread_t.h"
 void print_queue();
 /* Globals */
-scheduler * SCHEDULER;
+scheduler *SCHEDULER;
+ucontext_t SIGNAL_CONTEXT;
+void *SIGNAL_STACK;
 int SCHEDULER_INIT = 0;
 int NUMBER_LEVELS = 3;
 int NUMBER_LOCKS = 0;
@@ -14,7 +16,7 @@ int HAS_RUN=0;
 int START = 0;
 int CYCLE = 0;
 int STACK_SIZE = 8192; // 8192 kbytes is default stack size for CentOS
-int T_ID = 0;
+int TID = 0;
 int first_thread = 0;
 
 /* Static internal functions */
@@ -24,12 +26,12 @@ Handles argument passing to the function run by a thread, preperation for the
 thread to run, and cleanup after the thread finishes.
 */
 static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), void *arg) {
-	SCHEDULER->current_tcb = tcb_node;
+        printf("\n--\nFunction wrapper entered... tid: %d\nstate: RUNNING\n--\n", tcb_node->tid);
 	tcb_node->state = RUNNING;
 	tcb_node->initial_start_time = current_time();
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
-	SCHEDULER->current_tcb = NULL;
+        printf("\n--\ntid: %d\nstate: TERMINATED\nreturn value: %d\n--\n", tcb_node->tid, tcb_node->return_value);
 }
 
 /*
@@ -43,6 +45,7 @@ static int schedule_thread(tcb * tcb_node, int priority) {
 	tcb_node->state = READY;
 	tcb_node->priority = priority;
 	enqueue(&(SCHEDULER->multi_level_priority_queue[priority]), tcb_node);
+        //printf("tid %d added to schedule.\n", tcb_node->tid);
 	return 0;
 }
 
@@ -124,11 +127,13 @@ void init_scheduler() {
 	for (i = 0; i < NUMBER_LEVELS; i++) {
 		SCHEDULER->priority_time_slices[i] = TIME_SLICE * (i + 1);
 	}
+
+        SIGNAL_STACK = malloc(STACK_SIZE);
 }
 
-void execute(){
+void execute() {
         //setup signal
-        struct itimerval value_yield,ovalue; //(1)
+        struct itimerval value_yield, ovalue; //(1)
         signal(SIGALRM, signal_handler);
         value_yield.it_value.tv_sec = 0;
         value_yield.it_value.tv_usec = 25000;
@@ -136,6 +141,16 @@ void execute(){
         value_yield.it_interval.tv_usec = 25000;
         setitimer(ITIMER_REAL, &value_yield, &ovalue); //(2)
 
+}
+
+void clear_timer() {
+        struct itimerval tick;
+        //clear the timer
+        tick.it_value.tv_sec = 0;
+        tick.it_value.tv_usec = 0;
+        tick.it_interval.tv_sec = 0;
+        tick.it_interval.tv_usec = 0;
+        setitimer(ITIMER_REAL, &tick, NULL);
 }
 
 
@@ -148,23 +163,52 @@ void signal_handler(){
         if(first_thread == 0){
             return;
         }
-        if(START==0){
-                START=1;
+
+        // Run if there is only one thread.
+        /*
+        if(START==0) {
+                START = 1;
 
                 SCHEDULER->current_tcb = SCHEDULER->multi_level_priority_queue[0].head;
                 SCHEDULER->current_tcb->state = RUNNING;
                 SCHEDULER->current_tcb->recent_start_time = current_time();
                 HAS_RUN++;
-                setcontext(&SCHEDULER->current_tcb->context);
+                //setcontext(&SCHEDULER->current_tcb->context);
+                getcontext(&SIGNAL_CONTEXT);
+
+                SIGNAL_CONTEXT.uc_stack.ss_sp = SIGNAL_STACK;
+                SIGNAL_CONTEXT.uc_stack.ss_size = STACK_SIZE;
+                SIGNAL_CONTEXT.uc_stack.ss_flags = 0;
+                sigemptyset(&SIGNAL_CONTEXT.uc_sigmask);
+
+                swapcontext(&SIGNAL_CONTEXT, &(SCHEDULER->current_tcb->context));
         }
+        */
+        if (TID = 1) {
+
+        }
+
 
         if(CYCLE == 5){
                 CYCLE=0;
                 scheduler_maintenance();
                 //print_queue();
         }
-        if(time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority])!=-1){ //check if it need to yield
-                my_pthread_yield_helper();
+
+
+
+        if (time_compare(SCHEDULER->current_tcb->recent_start_time,current_time(),SCHEDULER->priority_time_slices[SCHEDULER->current_tcb->priority]) != -1) { //check if it need to yield
+                /* Create new scheduler context */
+                getcontext(&SIGNAL_CONTEXT);
+                SIGNAL_CONTEXT.uc_stack.ss_sp = SIGNAL_STACK;
+                SIGNAL_CONTEXT.uc_stack.ss_size = STACK_SIZE;
+                SIGNAL_CONTEXT.uc_stack.ss_flags = 0;
+                sigemptyset(&SIGNAL_CONTEXT.uc_sigmask);
+                makecontext(&SIGNAL_CONTEXT, my_pthread_yield_helper, 1);
+
+                /* save running thread, jump to scheduler */
+                swapcontext(&(SCHEDULER->current_tcb->context), &SIGNAL_CONTEXT);
+                //my_pthread_yield_helper();
         }
         sigprocmask(SIG_UNBLOCK, &block, NULL);
 }
@@ -379,30 +423,47 @@ void scheduler_maintenance() {
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function) (void *), void *arg) {
 	if (SCHEDULER_INIT == 0) { // Init scheduler if this is first time my_pthread_create is called.
-		init_scheduler();
-        SCHEDULER_INIT = 1;
+                SCHEDULER_INIT = 1;
+                init_scheduler();
 	}
+        // Create tcb for main context.
+        // Main context is the current on if create is running for the first time.
+        if (TID == 0) {
+                tcb *tcb_main = malloc(sizeof(tcb));
+        	tcb_main->tid = TID;
+                if (getcontext(&(tcb_main->context)) != 0) {
+                        return -1; // Error getthing context
+                }
+                // Configure main context stack.
+                printf("\nThread scheduled...\ntid %d\n", tcb_main->tid);
+                schedule_thread(tcb_main, 0);
+                SCHEDULER->current_tcb = tcb_main;
+        }
+
 	// Create new tcb for thread.
 	// Get current context.
 	tcb *tcb_node = malloc(sizeof(tcb));
-        T_ID++;
-	tcb_node->tid = T_ID;//*thread;
-        *thread = T_ID;
+        TID++;
+	tcb_node->tid = TID;//*thread;
+        *thread = TID;
 	if (getcontext(&(tcb_node->context)) != 0) {
 		return -1; // Error getthing context
 	}
 	// Configure context stack.
+	tcb_node->context.uc_link = 0;
 	tcb_node->context.uc_stack.ss_sp = malloc(STACK_SIZE);
 	tcb_node->context.uc_stack.ss_flags = 0;
 	tcb_node->context.uc_stack.ss_size = STACK_SIZE;
 	makecontext(&(tcb_node->context), (void *) thread_function_wrapper, 3, tcb_node, function, arg);
-
-        schedule_thread(tcb_node, 0);
+        printf("\nThread scheduled...\ntid %d\n", tcb_node->tid);
+        schedule_thread(tcb_node, 0); // Adds to mlpq and sets state to READY.
         if(first_thread == 0) {
                 first_thread = 1;
                 execute();
         }
+        /*
 	if (SCHEDULER_INIT == 0) {
+                SCHEDULER_INIT = 1;
 		// Schedule main context but don't run it.
 		tcb *tcb_main_node = malloc(sizeof(tcb));
 		tcb_main_node->tid = 0;
@@ -412,8 +473,8 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		// set context to thread that called my_pthread_create function.
 		tcb_main_node->context = *(tcb_main_node->context.uc_link);
 		schedule_thread(tcb_main_node, 0); // Schedule main thread.
-                SCHEDULER_INIT = 1;
 	}
+        */
 	return 0;
 }
 
@@ -471,18 +532,23 @@ void my_pthread_yield_helper() {
 
 	// Swap context to new SCHEDULER->current_tcb->context, store current context to &(SCHEDULER->current_tcb->context)
 
-        if (SCHEDULER->current_tcb->state == TERMINATED) {
-                printf("The state of the current thread: TERMINATED\n" );
+        if (SCHEDULER->current_tcb->state == YIELD) {
+                SCHEDULER->current_tcb->state = READY;
+                my_pthread_yield_helper();
+                return;
         }
 	if (SCHEDULER->current_tcb->state == TERMINATED) { // Don't run context if TERMINATED
                 my_pthread_yield_helper();
                 return;
 	}
+
 	SCHEDULER->current_tcb->state = RUNNING;
 	tcb_node->last_yield_time = current_time();
         SCHEDULER->current_tcb->recent_start_time = current_time();
         HAS_RUN++;
-        swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
+
+        setcontext(&(SCHEDULER->current_tcb->context));
+        //swapcontext(&(tcb_node->context), &(SCHEDULER->current_tcb->context));
 	//setcontext(&(SCHEDULER->current_tcb->context));
 
 	return;
@@ -490,6 +556,7 @@ void my_pthread_yield_helper() {
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
+        SCHEDULER->current_tcb->state = YIELD;
         return 0;
 }
 
@@ -510,33 +577,46 @@ void my_pthread_exit(void *value_ptr) {
 /* wait for thread termination */
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
         // Block schedule handler until thread to wait on is identified in multi_level_priority_queue.
+        //print_queue();
+        printf("\n--\njoin on thread: %d\n", thread);
+        /*
         sigset_t block;
         sigemptyset(&block);
         sigaddset(&block, SIGALRM);
         sigprocmask(SIG_BLOCK, &block, NULL);
-        tcb *tcb_node = NULL;
-        tcb *tcb_node_tmp;
+        */
         int i;
-        int j;
-        for (i = 0; i < NUMBER_LEVELS; i++) {
-                for (j = 0; j < SCHEDULER->multi_level_priority_queue[i].size; j++) {
-                        tcb_node_tmp = dequeue(&(SCHEDULER->multi_level_priority_queue[i]));
-                        if (tcb_node_tmp->tid == thread) {
-                                tcb_node = tcb_node_tmp;
+        int stop = 0;
+        int size = SCHEDULER->multi_level_priority_queue[i].size;
+        tcb* tcb_node = SCHEDULER->multi_level_priority_queue[i].head;
+        for (i = 0; i < NUMBER_LEVELS && !stop; i++) {
+                printf("\n* Level %d", i);
+                while (tcb_node != NULL) {
+                        printf("\n(L%d, %d)", i, tcb_node->tid);
+                        if (tcb_node->tid == thread) {
+                                printf("\nFound it");
+                                stop = 1;
+                                break;
                         }
+                        tcb_node = tcb_node->next_tcb;
                 }
         }
+        //Should search in wait_queue as well.
+        //sigprocmask(SIG_UNBLOCK, &block, NULL);
 
-        // Should search in wait_queue as well.
-
-        sigprocmask(SIG_UNBLOCK, &block, NULL);
         if (tcb_node == NULL) {
-                printf("Error, thread is not scheduled or in a wait queue.");
+                printf("Error, thread is not scheduled or in a wait queue.\n--\n");
                 return -1;
         }
-        while (tcb_node->state != TERMINATED); // Do nothing until thread is TERMINATED.
+
+        while (tcb_node->state != TERMINATED) {// Do nothing until thread is TERMINATED.
+                my_pthread_yield();
+        }
+
+        printf("Got through\n");
 
         value_ptr = tcb_node->return_value;
+        printf("\n--\n\n");
         return 0;
 }
 
@@ -633,10 +713,11 @@ void print_queue(){
     for(i=0;i<NUMBER_LEVELS;i++){
         int size = SCHEDULER->multi_level_priority_queue[i].size;
         tcb* p = SCHEDULER->multi_level_priority_queue[i].head;
+        printf("\n--\n");
         while(p!=NULL){
             printf("(L%d, %d) ", i, p->tid);
             p = p->next_tcb;
         }
-        printf("\n");
+        printf("\n--\n");
     }
 }

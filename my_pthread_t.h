@@ -25,6 +25,7 @@ typedef enum thread_state {
         RUNNING, // Currently running.
         READY, // Scheduled (in multi-level priority queue), in line to be run.
         WAITING, // Waiting in wait queue to aquire lock to critical section.
+        YIELD, // Yield thread
         TERMINATED // Thread finished running or was terminated early.
 } thread_state;
 
@@ -39,6 +40,7 @@ typedef struct threadControlBlock {
         struct timeval last_yield_time;
         void *return_value;
         struct threadControlBlock *next_tcb;
+        int joined;
 } tcb;
 
 typedef struct queue {
