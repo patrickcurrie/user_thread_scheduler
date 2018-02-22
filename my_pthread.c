@@ -31,7 +31,7 @@ static void thread_function_wrapper(tcb *tcb_node, void *(*function) (void *), v
 	tcb_node->initial_start_time = current_time();
 	tcb_node->return_value = (*function)(arg);
 	tcb_node->state = TERMINATED;
-        printf("\n--\ntid: %d\nstate: TERMINATED\nreturn value: %d\n--\n", tcb_node->tid, tcb_node->return_value);
+        printf("\n--\ntid: %d\nstate: TERMINATED\nreturn value: %d\n--\n", tcb_node->tid, *tcb_node->return_value);
 }
 
 /*
